@@ -151,7 +151,7 @@ Special thanks to the iExec and 50Partners teams for organizing Hack4Privacy.
 👥 Contributors
 Your Name/Team Name
 
-Built with ❤️ for the future of private, compliant, and transparent Real-World Assets on-chain.
+Built with ❤️ for the future of private, compliant, and transparent Real-World Assets on-chain.git
 
 
 # 🚀 iExec Next.js Starter - Decentralized Data Protection
@@ -303,3 +303,21 @@ npm run lint
 ---
 
 **Happy coding with iExec! 🔒✨**
+
+
+
+✔ Docker image built (sha256:f510c58918b5c8986e41649f56d63953297a9812d6954cf37d82919e16edcb5c) and tagged holyaustin/rwa-dividend-calculator:0.0.1
+✔ Pushed image holyaustin/rwa-dividend-calculator:0.0.1 on dockerhub
+✔ Pushed TEE image holyaustin/rwa-dividend-calculator:0.0.1-tee-scone-5.9.1-v16-prod-833fdb047064 on dockerhub
+✔ TEE app deployed
+✔ App secret attached to the app
+✔ Deployment of your iApp completed successfully:
+  - Docker image: holyaustin/rwa-dividend-calculator:0.0.1-tee-scone-5.9.1-v16-prod-833fdb047064
+  - iApp address: 0xB27cfF3fc965FaD42B5a97c350c9D9449Fd92D79
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                      │
+│   Run iapp run 0xB27cfF3fc965FaD42B5a97c350c9D9449Fd92D79 to execute your iApp on an iExec TEE       │
+│   worker                                                                                             │
+│                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────╯
