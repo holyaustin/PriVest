@@ -368,7 +368,7 @@ export default function AdminPortal() {
       try {
         const owner = await contract.owner();
         console.log("Contract owner:", owner);
-      } catch (error: unknown) {
+      } catch  {
         console.log("Could not fetch owner, contract might not be deployed yet");
       }
       
