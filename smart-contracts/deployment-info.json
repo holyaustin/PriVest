@@ -1,0 +1,15 @@
+{
+  "network": "arbitrum-sepolia",
+  "chainId": 421614,
+  "contractAddress": "0xe4741b7FF9c69904A6616AD8a61937F97d947331",
+  "contractName": "RWADividendDistributor",
+  "deployer": "0x2c3b2B2325610a6814f2f822D0bF4DAB8CF16e16",
+  "transactionHash": "0xddce2af7997079f630aee31f787b5972879f8ed6a6a168901a8f267ea0d58c9d",
+  "deployTimestamp": "2026-02-05T14:46:38.907Z",
+  "iAppAddress": "0xB27cfF3fc965FaD42B5a97c350c9D9449Fd92D79",
+  "nextSteps": [
+    "Update frontend .env.local with contract address",
+    "Run interaction script to test basic functions",
+    "Test iApp callback integration"
+  ]
+}

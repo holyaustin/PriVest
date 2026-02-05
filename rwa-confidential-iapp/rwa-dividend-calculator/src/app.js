@@ -6,6 +6,7 @@ import { PayoutCalculator } from './models/Payout.js';
 import { OutputFormatter } from './utils/outputFormatter.js';
 import { TierConfig } from './config/tiers.js';
 import { Constants } from './config/constants.js';
+import { ethers } from 'ethers';
 
 // Enhanced logging for TEE environment
 const log = (message, level = 'INFO') => {
@@ -35,10 +36,11 @@ export default async function main() {
     
     // --- 1. READ INPUT DATA ---
     log('Reading input data...');
-    const inputPath = join('/', 'iexec_in', 'input.json');
+    const inputPath = process.env.IEXEC_IN || '/iexec_in';
+    const inputFile = join(inputPath, 'input.json');
     
     try {
-      const inputFileContent = readFileSync(inputPath, 'utf-8');
+      const inputFileContent = readFileSync(inputFile, 'utf-8');
       inputData = JSON.parse(inputFileContent);
       log(`Input file loaded successfully (${inputFileContent.length} bytes)`);
     } catch (error) {
@@ -119,28 +121,62 @@ export default async function main() {
     log(`Total payout: ${summary.totalPayout} ${parsedInput.config.currency}`);
     log(`Allocation: ${summary.allocationPercentage}% of profits`);
     
-    // --- 4. FORMAT OUTPUTS ---
-    log('Formatting outputs...');
+    // --- 4. FORMAT OUTPUTS FOR SMART CONTRACT CALLBACK ---
+    log('Formatting outputs for smart contract callback...');
     
-    // Blockchain output (minimal data)
+    // Get blockchain-formatted output
     const blockchainOutput = OutputFormatter.formatForBlockchain(results, summary);
+    
+    // Extract arrays for ABI encoding
+    const investorAddresses = blockchainOutput.investors.map(inv => inv.address);
+    const payoutAmounts = blockchainOutput.investors.map(inv => inv.amount);
+    
+    // Calculate result hash for verification
+    const resultHash = ethers.keccak256(
+      ethers.AbiCoder.defaultAbiCoder().encode(
+        ['address[]', 'uint256[]'],
+        [investorAddresses, payoutAmounts]
+      )
+    );
+    
+    // ABI-encode data for smart contract callback
+    // Format: (address[] investors, uint256[] amounts, bytes32 resultHash)
+    const callbackData = ethers.AbiCoder.defaultAbiCoder().encode(
+      ['address[]', 'uint256[]', 'bytes32'],
+      [investorAddresses, payoutAmounts, resultHash]
+    );
     
     // Human-readable output (for logs/audit)
     const humanOutput = OutputFormatter.formatForHuman(results, summary, parsedInput.config);
     
-    // --- 5. WRITE OUTPUTS ---
-    const outputDir = process.env.IEXEC_OUT;
+    // --- 5. WRITE ALL OUTPUT FILES ---
+    const outputDir = process.env.IEXEC_OUT || '/iexec_out';
     
     if (!outputDir) {
       throw new Error('IEXEC_OUT environment variable not set');
     }
     
-    // Main output for iExec protocol
-    const mainOutputPath = join(outputDir, 'output.json');
-    writeFileSync(mainOutputPath, JSON.stringify(blockchainOutput, null, 2));
-    log(`Main output written to: ${mainOutputPath}`);
+    // CRITICAL: Write computed.json with callback data for iExec protocol
+    const computedJson = {
+      'deterministic-output-path': `${outputDir}/result.json`,
+      'callback-data': callbackData  // This triggers smart contract callback
+    };
+    const computedJsonPath = join(outputDir, 'computed.json');
+    writeFileSync(computedJsonPath, JSON.stringify(computedJson, null, 2));
+    log(`✅ Computed JSON written to: ${computedJsonPath}`);
     
-    // Detailed report (not sent on-chain, just for reference)
+    // Write main result file
+    const mainOutputPath = join(outputDir, 'result.json');
+    const finalResult = {
+      investors: blockchainOutput.investors,
+      resultHash: resultHash,
+      totalPayout: summary.totalPayout,
+      timestamp: new Date().toISOString()
+    };
+    writeFileSync(mainOutputPath, JSON.stringify(finalResult, null, 2));
+    log(`Main result written to: ${mainOutputPath}`);
+    
+    // Detailed report (for debugging)
     const detailedReportPath = join(outputDir, 'detailed-report.json');
     writeFileSync(detailedReportPath, JSON.stringify(humanOutput, null, 2));
     log(`Detailed report written to: ${detailedReportPath}`);
@@ -152,6 +188,13 @@ PriVest Confidential Calculation Summary
 ========================================
 Calculation ID: ${inputData.metadata?.calculationId || 'N/A'}
 Timestamp: ${new Date().toISOString()}
+
+SMART CONTRACT CALLBACK READY
+-----------------------------
+- Callback data prepared: YES
+- Investor count: ${investorAddresses.length}
+- Total payout: ${summary.totalPayout} ${parsedInput.config.currency}
+- Result hash: ${resultHash}
 
 Input Summary:
 - Total Profit: ${parsedInput.totalProfit} ${parsedInput.config.currency}
@@ -165,7 +208,7 @@ Output Summary:
 Tier Distribution:
 ${Object.entries(summary.tierDistribution).map(([tier, count]) => `  ${tier}: ${count} investors`).join('\n')}
 
-Result Hash: ${blockchainOutput.resultHash}
+Callback Data Length: ${callbackData.length} bytes
     `.trim();
     
     writeFileSync(summaryPath, summaryText);
@@ -175,13 +218,14 @@ Result Hash: ${blockchainOutput.resultHash}
     log('✅ Calculation completed successfully!');
     log(`📊 Results: ${results.length} payouts calculated`);
     log(`💰 Total payout: ${summary.totalPayout} ${parsedInput.config.currency}`);
+    log(`🔗 Smart contract callback data ready (${callbackData.length} bytes)`);
     
-    // Return success
     return {
       success: true,
-      resultHash: blockchainOutput.resultHash,
+      resultHash: resultHash,
       investorCount: results.length,
       totalPayout: summary.totalPayout,
+      callbackDataSize: callbackData.length,
       timestamp: new Date().toISOString()
     };
     

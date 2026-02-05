@@ -1,73 +1,60 @@
-import { Constants } from '../config/constants.js';
-
 export class OutputFormatter {
-  static formatForBlockchain(results, summary, includePrivateData = false) {
-    // Prepare minimal data for on-chain storage
-    const blockchainOutput = {
-      version: Constants.OUTPUT_FORMAT_VERSION,
-      timestamp: new Date().toISOString(),
-      investors: results.map(r => r.investor),
-      amounts: results.map(r => r.finalPayout),
-      totalPayout: summary.totalPayout,
-      investorCount: summary.investorCount,
-      resultHash: this.calculateResultHash(results)
-    };
-
-    // Include detailed data only if requested (for debugging/auditing)
-    if (includePrivateData) {
-      blockchainOutput.detailedResults = results;
-      blockchainOutput.summary = summary;
-    }
-
-    return blockchainOutput;
-  }
-
-  static formatForHuman(results, summary, config) {
-    // Human-readable output
+  /**
+   * Format results for blockchain consumption
+   * @param {Array} results - Array of payout results from PayoutCalculator
+   * @param {Object} summary - Summary object from PayoutCalculator
+   * @returns {Object} Formatted for blockchain callback
+   */
+  static formatForBlockchain(results, summary) {
     return {
-      header: {
-        app: Constants.APP_NAME,
-        version: Constants.VERSION,
-        timestamp: new Date().toISOString(),
-        currency: config.currency
-      },
+      investors: results.map(r => ({
+        address: r.address,
+        amount: r.finalAmount,
+        name: r.name || 'Unknown',
+        tier: r.tier || 'Unknown'
+      })),
       summary: {
-        totalProfit: summary.totalProfit,
         totalPayout: summary.totalPayout,
         allocationPercentage: summary.allocationPercentage,
-        investorCount: summary.investorCount,
-        tierDistribution: summary.tierDistribution
-      },
-      payouts: results.map(result => ({
-        investor: result.investor,
-        name: result.metadata.name || 'Unknown',
-        originalStake: result.originalStake,
-        finalPayout: result.finalPayout,
-        tier: result.tier,
-        effectiveBonus: `${(result.effectiveBonus * 100 - 100).toFixed(2)}%`
-      })),
-      metadata: {
-        calculationTime: new Date().toISOString(),
-        configUsed: config
+        investorCount: results.length
       }
     };
   }
 
-  static calculateResultHash(results) {
-    // Create a deterministic hash of results for verification
-    const dataToHash = results
-      .map(r => `${r.investor}:${r.finalPayout}`)
-      .sort()
-      .join('|');
-    
-    // Simple hash - in production, use crypto-js SHA256
-    let hash = 0;
-    for (let i = 0; i < dataToHash.length; i++) {
-      const char = dataToHash.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    
-    return `0x${Math.abs(hash).toString(16).padStart(64, '0')}`;
+  /**
+   * Format results for human-readable audit logs
+   * @param {Array} results - Array of payout results
+   * @param {Object} summary - Summary object
+   * @param {Object} config - Configuration object
+   * @returns {Object} Detailed human-readable output
+   */
+  static formatForHuman(results, summary, config) {
+    return {
+      calculationDetails: {
+        timestamp: new Date().toISOString(),
+        currency: config.currency,
+        configUsed: config
+      },
+      investors: results.map(r => ({
+        name: r.name,
+        address: r.address,
+        rawStake: r.rawStake,
+        stakePercentage: r.stakePercentage,
+        basePayout: r.basePayout,
+        tierBonus: r.tierBonus,
+        performanceBonus: r.performanceBonus,
+        finalAmount: r.finalAmount,
+        tier: r.tier,
+        formattedAmount: `${r.finalAmount.toFixed(config.roundingPrecision)} ${config.currency}`
+      })),
+      summary: {
+        totalProfit: summary.totalProfit,
+        totalPayout: summary.totalPayout,
+        allocationPercentage: summary.allocationPercentage,
+        averagePayout: summary.totalPayout / results.length,
+        tierDistribution: summary.tierDistribution,
+        formattedTotal: `${summary.totalPayout.toFixed(config.roundingPrecision)} ${config.currency}`
+      }
+    };
   }
 }
