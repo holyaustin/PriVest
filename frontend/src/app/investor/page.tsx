@@ -211,7 +211,7 @@ export default function InvestorPortal() {
               <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No dividends yet</h3>
               <p className="text-gray-600 max-w-sm mx-auto">
-                Your dividends will appear here once they're calculated by the admin.
+                Your dividends will appear here once they&apos;re calculated by the admin.
               </p>
             </div>
           )}

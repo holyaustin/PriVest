@@ -17,12 +17,28 @@ import {
 
 // Configuration
 const IAPP_ADDRESS = "0xB27cfF3fc965FaD42B5a97c350c9D9449Fd92D79";
-const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0xe4741b7FF9c69904A6616AD8a61937F97d947331") as `0x${string}`;
+const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`;
 
 interface Investor {
   address: string;
   stake: string;
   name: string;
+}
+
+// Define proper types for iExec
+interface IExecTaskOrder {
+  app: string;
+  params: {
+    callback: string;
+    args: string;
+  };
+}
+
+interface IExecInstance {
+  task: {
+    createTaskOrder: (order: IExecTaskOrder) => Promise<Record<string, unknown>>;
+    placeTaskOrder: (order: Record<string, unknown>) => Promise<{ taskId: `0x${string}` }>;
+  };
 }
 
 // Minimal ABI for our contract - only the functions we need
@@ -232,6 +248,14 @@ const DISTRIBUTOR_ABI = [
   }
 ] as const;
 
+interface RecentTask {
+  id: string;
+  status: string;
+  amount: string;
+  date: string;
+  txHash: string;
+}
+
 // ✅ Safe type guard for Ethereum provider (NO global redeclaration)
 type SafeEip1193Provider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -240,13 +264,13 @@ type SafeEip1193Provider = {
 function getEthereumProvider(): SafeEip1193Provider | null {
   if (typeof window === "undefined") return null;
 
-  const eth = (window as any).ethereum;
+  const eth = (window as { ethereum?: SafeEip1193Provider }).ethereum;
 
   if (!eth || typeof eth.request !== "function") {
     return null;
   }
 
-  return eth as unknown as SafeEip1193Provider;
+  return eth as SafeEip1193Provider;
 }
 
 export default function AdminPortal() {
@@ -260,8 +284,8 @@ export default function AdminPortal() {
   const [taskId, setTaskId] = useState<`0x${string}`>("0x" as `0x${string}`);
   const [status, setStatus] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [recentTasks, setRecentTasks] = useState<any[]>([]);
-  const [iexecInstance, setIexecInstance] = useState<any>(null);
+  const [recentTasks, setRecentTasks] = useState<RecentTask[]>([]);
+  const [iexecInstance, setIexecInstance] = useState<IExecInstance | null>(null);
 
   // Contract write for registering tasks (Wagmi v2 syntax)
   const { 
@@ -282,38 +306,14 @@ export default function AdminPortal() {
     }
   }, [isConfirmed]);
 
-  // Initialize iExec SDK when wallet connects
-  useEffect(() => {
-    const initializeIExec = async () => {
-      const provider = getEthereumProvider();
-      if (isConnected && provider) {
-        try {
-          // Dynamically import iExec SDK
-          const { IExec } = await import("iexec");
-          
-          const iexec = new IExec({
-            ethProvider: provider as any,
-          });
-          setIexecInstance(iexec);
-          console.log("iExec SDK initialized successfully");
-        } catch (error) {
-          console.warn("iExec SDK unavailable, using mock:", error);
-          setIexecInstance(createMockIExec());
-        }
-      }
-    };
-    
-    initializeIExec();
-  }, [isConnected]);
-
   // Create mock iExec for development
-  const createMockIExec = () => ({
+  const createMockIExec = (): IExecInstance => ({
     task: {
-      createTaskOrder: async (order: any) => {
+      createTaskOrder: async (order: IExecTaskOrder): Promise<Record<string, unknown>> => {
         console.log("[MOCK] Creating task order:", order);
         return { ...order, mock: true };
       },
-      placeTaskOrder: async (order: any) => {
+      placeTaskOrder: async (order: Record<string, unknown>): Promise<{ taskId: `0x${string}` }> => {
         console.log("[MOCK] Placing task order:", order);
         await new Promise(resolve => setTimeout(resolve, 1000));
         const mockTaskId = `0x${Array.from({length: 64}, () => 
@@ -325,6 +325,30 @@ export default function AdminPortal() {
       }
     }
   });
+
+  // Initialize iExec SDK when wallet connects
+  useEffect(() => {
+    const initializeIExec = async () => {
+      const provider = getEthereumProvider();
+      if (isConnected && provider) {
+        try {
+          // Dynamically import iExec SDK
+          const { IExec } = await import("iexec");
+          
+          const iexec = new IExec({
+            ethProvider: provider as unknown as ethers.Eip1193Provider,
+          });
+          setIexecInstance(iexec as unknown as IExecInstance);
+          console.log("iExec SDK initialized successfully");
+        } catch (error) {
+          console.warn("iExec SDK unavailable, using mock:", error);
+          setIexecInstance(createMockIExec());
+        }
+      }
+    };
+    
+    initializeIExec();
+  }, [isConnected]);
 
   // Fetch recent tasks from contract
   const fetchRecentTasks = async () => {
@@ -344,7 +368,7 @@ export default function AdminPortal() {
       try {
         const owner = await contract.owner();
         console.log("Contract owner:", owner);
-      } catch (err) {
+      } catch (error: unknown) {
         console.log("Could not fetch owner, contract might not be deployed yet");
       }
       
@@ -381,12 +405,31 @@ export default function AdminPortal() {
     }
   }, [isConnected]);
 
-  const prepareIAppInput = () => {
+  interface IAppInput {
+    totalProfit: number;
+    investors: Array<{
+      address: string;
+      stake: number;
+      name: string;
+      metadata: {
+        performanceScore: number;
+        investmentDate: string;
+      };
+    }>;
+    config: {
+      enablePerformanceBonus: boolean;
+      currency: string;
+      timestamp: string;
+      calculationId: string;
+    };
+  }
+
+  const prepareIAppInput = (): IAppInput => {
     return {
-      totalProfit: parseInt(profit),
+      totalProfit: parseInt(profit) || 0,
       investors: investors.map((inv, idx) => ({
         address: inv.address || `0xInvestorDemo${idx + 1}`,
-        stake: parseInt(inv.stake),
+        stake: parseInt(inv.stake) || 0,
         name: inv.name,
         metadata: { 
           performanceScore: 85 + idx * 5,
@@ -413,9 +456,9 @@ export default function AdminPortal() {
         args: [taskId, "0x"], // Empty bytes for demo
       });
       setStatus("📝 Registering task in smart contract...");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to register task:", error);
-      setStatus(`❌ Contract error: ${error.message}`);
+      setStatus(`❌ Contract error: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
@@ -451,7 +494,7 @@ export default function AdminPortal() {
       // Place order on iExec
       setStatus("⏳ Submitting to iExec decentralized network...");
       const placedOrder = await iexec.task.placeTaskOrder(taskOrder);
-      const newTaskId = placedOrder.taskId as `0x${string}`;
+      const newTaskId = placedOrder.taskId;
       setTaskId(newTaskId);
       
       setStatus(`✅ Task launched! ID: ${newTaskId.slice(0, 10)}...`);
@@ -459,11 +502,11 @@ export default function AdminPortal() {
       // Register task in our smart contract
       registerTaskInContract();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Calculation failed:", error);
       
       // For demo/hackathon purposes, simulate a successful task
-      if (error.message?.includes("mock") || !iexecInstance) {
+      if (error instanceof Error && (error.message?.includes("mock") || !iexecInstance)) {
         const mockTaskId = `0x${Array.from({length: 64}, () => 
           Math.floor(Math.random() * 16).toString(16)
         ).join('')}` as `0x${string}`;
@@ -471,7 +514,7 @@ export default function AdminPortal() {
         setStatus(`✅ Demo Mode: Task simulation complete! ID: ${mockTaskId.slice(0, 10)}...`);
         registerTaskInContract();
       } else {
-        setStatus(`❌ Error: ${error.message || "Unknown error occurred"}`);
+        setStatus(`❌ Error: ${error instanceof Error ? error.message : "Unknown error occurred"}`);
       }
     } finally {
       setIsProcessing(false);
