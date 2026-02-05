@@ -1,617 +1,195 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useAppKit } from "@reown/appkit/react";
-import { useAccount, useDisconnect, useChainId, useSwitchChain } from "wagmi";
-import {
-  IExecDataProtector,
-  IExecDataProtectorCore,
-  ProtectedData,
-  GrantedAccess,
-} from "@iexec/dataprotector";
-import WelcomeBlock from "@/components/WelcomeBlock";
-import wagmiNetworks, { explorerSlugs } from "@/config/wagmiNetworks";
+import { useAccount } from "wagmi";
+import Link from "next/link";
+import { ArrowRight, Shield, Lock, BarChart, Zap } from "lucide-react";
 
-// External Link Icon Component
-const ExternalLinkIcon = () => (
-  <svg
-    className="inline-block w-3 h-3 ml-1"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-    />
-  </svg>
-);
-
-export default function Home() {
+export default function LandingPage() {
   const { open } = useAppKit();
-  const { disconnectAsync } = useDisconnect();
-  const { isConnected, connector, address } = useAccount();
-  const chainId = useChainId();
-  const { switchChain } = useSwitchChain();
+  const { isConnected } = useAccount();
 
-  const [dataProtectorCore, setDataProtectorCore] =
-    useState<IExecDataProtectorCore | null>(null);
-  const [dataToProtect, setDataToProtect] = useState({
-    name: "",
-    data: "",
-  });
-  const [protectedData, setProtectedData] = useState<ProtectedData>();
-  const [isLoading, setIsLoading] = useState(false);
+  const login = () => open({ view: "Connect" });
 
-  // iExec Web3Mail app addresses by chain
-  const web3MailAddresses = {
-    134: "0x781482c39cce25546583eac4957fb7bf04c277d2", // iExec Sidechain (Bellecour)
-    42161: "0xd5054a18565c4a9e5c1aa3ceb53258bd59d4c78c", // Arbitrum One
-  } as const;
-
-  // Grant Access form data
-  const [grantAccessData, setGrantAccessData] = useState({
-    protectedDataAddress: "",
-    authorizedApp: "",
-    authorizedUser: "",
-    pricePerAccess: 0,
-    numberOfAccess: 1,
-  });
-  const [grantedAccess, setGrantedAccess] = useState<GrantedAccess>();
-  const [isGrantingAccess, setIsGrantingAccess] = useState(false);
-
-  const networks = Object.values(wagmiNetworks);
-
-  const login = () => {
-    open({ view: "Connect" });
-  };
-
-  const logout = async () => {
-    try {
-      await disconnectAsync();
-    } catch (err) {
-      console.error("Failed to logout:", err);
+  const features = [
+    {
+      icon: <Shield className="w-8 h-8" />,
+      title: "Confidential Computing",
+      description: "Profit calculations run inside iExec TEEs. Your formulas and sensitive data remain encrypted.",
+      color: "from-blue-500 to-blue-600"
+    },
+    {
+      icon: <Lock className="w-8 h-8" />,
+      title: "Privacy-Preserving",
+      description: "Only final payout amounts are revealed on-chain. Investor stakes and profit data stay private.",
+      color: "from-purple-500 to-purple-600"
+    },
+    {
+      icon: <BarChart className="w-8 h-8" />,
+      title: "Real-Time Analytics",
+      description: "Monitor RWA performance and investor allocations with comprehensive dashboards.",
+      color: "from-green-500 to-green-600"
+    },
+    {
+      icon: <Zap className="w-8 h-8" />,
+      title: "Automated Payouts",
+      description: "Smart contracts automatically distribute dividends once confidential calculations complete.",
+      color: "from-orange-500 to-orange-600"
     }
-  };
+  ];
 
-  const handleChainChange = async (
-    event: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    const selectedChainId = parseInt(event.target.value);
-    if (selectedChainId && selectedChainId !== chainId && switchChain) {
-      try {
-        await switchChain({ chainId: selectedChainId });
-      } catch (error) {
-        console.error("Failed to switch chain:", error);
-      }
-    }
-  };
-
-  // Get Web3Mail address for current chain
-  const getCurrentWeb3MailAddress = () => {
-    return web3MailAddresses[chainId as keyof typeof web3MailAddresses] || "";
-  };
-
-  // Get explorer URL for current chain using iExec explorer
-  const getExplorerUrl = (
-    address: string | undefined,
-    type: "address" | "dataset" | "apps" = "address"
-  ) => {
-    const explorerSlug = explorerSlugs[chainId];
-    if (!explorerSlug) return null;
-
-    if (!address) return `https://explorer.iex.ec/${explorerSlug}/${type}`;
-    return `https://explorer.iex.ec/${explorerSlug}/${type}/${address}`;
-  };
-
-  useEffect(() => {
-    const initializeDataProtector = async () => {
-      if (isConnected && connector) {
-        try {
-          const provider =
-            (await connector.getProvider()) as import("ethers").Eip1193Provider;
-          const dataProtector = new IExecDataProtector(provider, {
-            allowExperimentalNetworks: true,
-          });
-          setDataProtectorCore(dataProtector.core);
-        } catch (error) {
-          console.error("Failed to initialize data protector:", error);
-        }
-      }
-    };
-
-    initializeDataProtector();
-  }, [isConnected, connector]);
-
-  const grantDataAccess = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (dataProtectorCore) {
-      setIsGrantingAccess(true);
-      try {
-        const result = await dataProtectorCore.grantAccess({
-          protectedData: grantAccessData.protectedDataAddress,
-          authorizedApp: grantAccessData.authorizedApp,
-          authorizedUser: grantAccessData.authorizedUser,
-          pricePerAccess: grantAccessData.pricePerAccess,
-          numberOfAccess: grantAccessData.numberOfAccess,
-          onStatusUpdate: ({
-            title,
-            isDone,
-          }: {
-            title: string;
-            isDone: boolean;
-          }) => {
-            console.log(`Grant Access Status: ${title}, Done: ${isDone}`);
-          },
-        });
-        console.log("Granted Access:", result);
-        setGrantedAccess(result);
-      } catch (error) {
-        console.error("Error granting access:", error);
-      } finally {
-        setIsGrantingAccess(false);
-      }
-    }
-  };
-
-  const protectData = async (event: { preventDefault: () => void }) => {
-    event.preventDefault();
-    if (dataProtectorCore) {
-      setIsLoading(true);
-      try {
-        const protectedData = await dataProtectorCore.protectData({
-          name: dataToProtect.name,
-          data: {
-            email: dataToProtect.data,
-          },
-        });
-        console.log("Protected Data:", protectedData);
-        setProtectedData(protectedData);
-      } catch (error) {
-        console.error("Error protecting data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-  };
+  const stats = [
+    { value: "100%", label: "Confidential" },
+    { value: "0%", label: "Data Exposure" },
+    { value: "<30s", label: "TEE Calculation" },
+    { value: "∞", label: "Scalability" }
+  ];
 
   return (
-    <div className="max-w-6xl mx-auto p-5">
-      <nav className="bg-[#F4F7FC] rounded-xl p-4 mb-8 flex justify-between items-center">
-        <div className="flex items-center gap-6">
-          <div className="font-mono text-xl font-bold text-gray-800">
-            iExec NextJs Starter
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          {isConnected && (
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor="chain-selector"
-                className="text-sm font-medium text-gray-700"
-              >
-                Chain:
-              </label>
-              <select
-                id="chain-selector"
-                value={chainId}
-                onChange={handleChainChange}
-                className="chain-selector"
-              >
-                {networks?.map((network) => (
-                  <option key={network.id} value={network.id}>
-                    {network.name}
-                  </option>
-                ))}
-              </select>
+    <>
+      {/* Hero Section */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50" />
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent" />
+        
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+          <div className="text-center">
+            <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 border border-blue-200 mb-8">
+              <span className="text-sm font-medium text-blue-700">
+                🏆 Built for iExec Hack4Privacy Hackathon
+              </span>
             </div>
-          )}
-          {!isConnected ? (
-            <button onClick={login} className="primary">
-              Connect my wallet
-            </button>
-          ) : (
-            <button onClick={logout} className="secondary">
-              Disconnect
-            </button>
-          )}
-        </div>
-      </nav>
-
-      <WelcomeBlock />
-
-      <section className="p-8 bg-[#F4F7FC] rounded-xl">
-        {isConnected ? (
-          <div>
-            <h2 className="mb-6 text-2xl font-semibold text-gray-800">
-              Protect my data
-            </h2>
-            <form onSubmit={protectData} className="mb-8">
-              <div className="mb-5">
-                <label
-                  htmlFor="data_name"
-                  className="block mb-2 font-medium text-gray-700"
-                >
-                  Data name to protect
-                </label>
-                <input
-                  onChange={(e) =>
-                    setDataToProtect((prevData) => ({
-                      ...prevData,
-                      name: e.target.value,
-                    }))
-                  }
-                  type="text"
-                  id="data_name"
-                  placeholder="Name to identify your data"
-                  value={dataToProtect.name}
-                  maxLength={100}
-                />
-              </div>
-              <div className="mb-5">
-                <label
-                  htmlFor="data_content"
-                  className="block mb-2 font-medium text-gray-700"
-                >
-                  Data to protect
-                </label>
-                <input
-                  onChange={(e) =>
-                    setDataToProtect((prevData) => ({
-                      ...prevData,
-                      data: e.target.value,
-                    }))
-                  }
-                  type="text"
-                  id="data_content"
-                  placeholder="Enter text to protect"
-                  value={dataToProtect.data}
-                  maxLength={500}
-                />
-              </div>
-              <button
-                disabled={
-                  !dataToProtect.name || !dataToProtect.data || isLoading
-                }
-                className="primary"
-                type="submit"
-              >
-                {isLoading ? "Protecting data..." : "Protect my data"}
-              </button>
-            </form>
-
-            {protectedData && (
-              <div className="bg-blue-100 border border-blue-300 rounded-xl p-6 mt-6">
-                <h3 className="text-blue-800 mb-4 text-lg font-semibold">
-                  ✅ Data protected successfully!
-                </h3>
-                <div className="text-blue-800 space-y-2 text-sm">
-                  <p>
-                    <strong>Name:</strong> {protectedData.name}
-                  </p>
-                  <p>
-                    <strong>Address:</strong> {protectedData.address}
-                    {getExplorerUrl(protectedData.address, "dataset") && (
-                      <a
-                        href={getExplorerUrl(protectedData.address, "dataset")!}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ml-2 inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors"
-                      >
-                        View Protected Data <ExternalLinkIcon />
-                      </a>
-                    )}
-                  </p>
-                  <p>
-                    <strong>Owner:</strong> {protectedData.owner}
-                    {getExplorerUrl(protectedData.owner, "address") && (
-                      <a
-                        href={getExplorerUrl(protectedData.owner, "address")!}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ml-2 inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors"
-                      >
-                        View Address
-                        <ExternalLinkIcon />
-                      </a>
-                    )}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Grant Access Form */}
-            <div className="mt-12 pt-8 border-t border-gray-200">
-              <h2 className="mb-6 text-2xl font-semibold text-gray-800">
-                Grant Access to Protected Data
-              </h2>
-              <form onSubmit={grantDataAccess} className="mb-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label
-                      htmlFor="protected_data_address"
-                      className="block mb-2 font-medium text-gray-700"
-                    >
-                      Protected Data Address *
-                    </label>
-                    <input
-                      value={grantAccessData.protectedDataAddress}
-                      onChange={(e) =>
-                        setGrantAccessData((prev) => ({
-                          ...prev,
-                          protectedDataAddress: e.target.value,
-                        }))
-                      }
-                      type="text"
-                      id="protected_data_address"
-                      placeholder="0x123abc..."
-                      maxLength={42}
-                      required
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Address of the protected data you own
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setGrantAccessData((prev) => ({
-                          ...prev,
-                          protectedDataAddress: protectedData?.address || "",
-                        }))
-                      }
-                      disabled={!protectedData?.address}
-                      className="mt-1 secondary h-9"
-                    >
-                      Use previously created Protected Data
-                    </button>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="authorized_user"
-                      className="block mb-2 font-medium text-gray-700"
-                    >
-                      Authorized User Address *
-                    </label>
-                    <input
-                      value={grantAccessData.authorizedUser}
-                      onChange={(e) =>
-                        setGrantAccessData((prev) => ({
-                          ...prev,
-                          authorizedUser: e.target.value,
-                        }))
-                      }
-                      type="text"
-                      id="authorized_user"
-                      placeholder="0x789cba... or 0x0000... for all users"
-                      maxLength={42}
-                      required
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      User who can access the data (use 0x0000... for all users)
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setGrantAccessData((prev) => ({
-                          ...prev,
-                          authorizedUser: address || "",
-                        }))
-                      }
-                      disabled={!address}
-                      className="mt-1 secondary h-9"
-                    >
-                      Use current wallet address
-                    </button>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="authorized_app"
-                      className="block mb-2 font-medium text-gray-700"
-                    >
-                      Authorized iApp Address *
-                    </label>
-                    <input
-                      value={grantAccessData.authorizedApp}
-                      onChange={(e) =>
-                        setGrantAccessData((prev) => ({
-                          ...prev,
-                          authorizedApp: e.target.value,
-                        }))
-                      }
-                      type="text"
-                      id="authorized_app"
-                      placeholder="Enter iApp address (0x...)"
-                      maxLength={42}
-                      required
-                    />
-                    <div className="text-xs text-gray-500 mt-2 space-y-1">
-                      <p>
-                        iApp authorized to access your protected data.
-                      </p>
-                      <p className="text-gray-400 mt-1">
-                        iApp addresses vary by chain. Always verify before
-                        granting access.
-                      </p>
-                      {getExplorerUrl("apps") && (
-                        <a
-                          href={getExplorerUrl("apps")!}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors"
-                        >
-                          See available iApp on Explorer <ExternalLinkIcon />
-                        </a>
-                      )}
-                    </div>
-                    {getCurrentWeb3MailAddress() && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setGrantAccessData((prev) => ({
-                            ...prev,
-                            authorizedApp: getCurrentWeb3MailAddress(),
-                          }))
-                        }
-                        className="mt-2 secondary h-9"
-                      >
-                        Use Web3Mail Whitelist address for current chain
-                      </button>
-                    )}
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="number_of_access"
-                      className="block mb-2 font-medium text-gray-700"
-                    >
-                      Number of Access
-                    </label>
-                    <input
-                      value={grantAccessData.numberOfAccess}
-                      onChange={(e) =>
-                        setGrantAccessData((prev) => ({
-                          ...prev,
-                          numberOfAccess: parseInt(e.target.value) || 1,
-                        }))
-                      }
-                      type="number"
-                      id="number_of_access"
-                      placeholder="1"
-                      min="1"
-                      max="10000"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      How many times the data can be accessed
-                    </p>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label
-                      htmlFor="price_per_access"
-                      className="block mb-2 font-medium text-gray-700"
-                    >
-                      Price Per Access (nRLC)
-                    </label>
-                    <input
-                      value={grantAccessData.pricePerAccess}
-                      onChange={(e) =>
-                        setGrantAccessData((prev) => ({
-                          ...prev,
-                          pricePerAccess: parseFloat(e.target.value) || 0,
-                        }))
-                      }
-                      type="number"
-                      id="price_per_access"
-                      placeholder="0"
-                      min="0"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Fee in nano RLC for each access (1 RLC = 10^9 nRLC)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <button
-                    disabled={
-                      !grantAccessData.protectedDataAddress ||
-                      !grantAccessData.authorizedUser ||
-                      !grantAccessData.authorizedApp ||
-                      isGrantingAccess
-                    }
-                    className="primary"
-                    type="submit"
-                  >
-                    {isGrantingAccess ? "Granting Access..." : "Grant Access"}
-                  </button>
-                </div>
-              </form>
-
-              {grantedAccess && (
-                <div className="bg-blue-100 border border-blue-300 rounded-xl p-6 mt-6">
-                  <h3 className="text-blue-800 mb-4 text-lg font-semibold">
-                    ✅ Access granted successfully!
-                  </h3>
-                  <div className="text-blue-800 space-y-2 text-sm">
-                    <p>
-                      <strong>Protected Data:</strong> {grantedAccess.dataset}
-                      {getExplorerUrl(grantedAccess.dataset, "dataset") && (
-                        <a
-                          href={
-                            getExplorerUrl(grantedAccess.dataset, "dataset")!
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-2 inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors"
-                        >
-                          View Protected Data
-                          <ExternalLinkIcon />
-                        </a>
-                      )}
-                    </p>
-                    <p>
-                      <strong>Protected Data Price:</strong>{" "}
-                      {grantedAccess.datasetprice} nRLC
-                    </p>
-                    <p>
-                      <strong>Volume:</strong> {grantedAccess.volume}
-                    </p>
-                    <p>
-                      <strong>iApp Restrict:</strong> {grantedAccess.apprestrict}
-                    </p>
-                    <p>
-                      <strong>Workerpool Restrict:</strong>{" "}
-                      {grantedAccess.workerpoolrestrict}
-                    </p>
-                    <p>
-                      <strong>Requester Restrict:</strong>{" "}
-                      {grantedAccess.requesterrestrict}
-                      {grantedAccess.requesterrestrict !==
-                        "0x0000000000000000000000000000000000000000" &&
-                        getExplorerUrl(
-                          grantedAccess.requesterrestrict,
-                          "address"
-                        ) && (
-                          <a
-                            href={
-                              getExplorerUrl(
-                                grantedAccess.requesterrestrict,
-                                "address"
-                              )!
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="ml-2 inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors"
-                          >
-                            View Requester
-                            <ExternalLinkIcon />
-                          </a>
-                        )}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-12 px-6">
-            <h2 className="mb-4 text-xl text-gray-600">
-              Connect your wallet to get started
-            </h2>
-            <p className="text-gray-500 mb-6">
-              You need to connect your wallet to use data protection features.
+            
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
+              <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 bg-clip-text text-transparent">
+                Confidential RWA Management
+              </span>
+            </h1>
+            
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-10">
+              PriVest leverages iExec Trusted Execution Environments to provide 
+              <span className="font-semibold text-blue-600"> completely private profit calculations </span>
+              for Real-World Assets. Your sensitive data never leaves the secure enclave.
             </p>
-            <button onClick={login} className="primary">
-              Connect my wallet
-            </button>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+              {!isConnected ? (
+                <button
+                  onClick={login}
+                  className="group px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                >
+                  Launch App
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </button>
+              ) : (
+                <Link
+                  href="/admin"
+                  className="group px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                >
+                  Go to Admin Portal
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              )}
+              
+              <Link
+                href="/investor"
+                className="px-8 py-4 bg-white text-gray-800 font-semibold rounded-xl border-2 border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all"
+              >
+                Investor Portal
+              </Link>
+            </div>
           </div>
-        )}
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto mb-20">
+            {stats.map((stat, index) => (
+              <div key={index} className="text-center p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                <div className="text-3xl font-bold text-gray-900 mb-2">{stat.value}</div>
+                <div className="text-sm text-gray-600">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Features Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
+            {features.map((feature, index) => (
+              <div key={index} className="group p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300">
+                <div className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${feature.color} text-white mb-4`}>
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">{feature.title}</h3>
+                <p className="text-gray-600">{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
-    </div>
+
+      {/* How It Works */}
+      <section className="py-20 bg-gradient-to-b from-white to-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">How PriVest Works</h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              A seamless integration of iExec TEEs and smart contracts for privacy-preserving RWA management
+            </p>
+          </div>
+
+          <div className="relative">
+            {/* Connection Lines */}
+            <div className="hidden lg:block absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-200 via-purple-200 to-blue-200 transform -translate-y-1/2" />
+            
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+              {[
+                { step: "1", title: "Input Sensitive Data", desc: "Admin inputs confidential profit data and investor stakes" },
+                { step: "2", title: "TEE Calculation", desc: "iExec runs your formula in a secure Trusted Execution Environment" },
+                { step: "3", title: "Verifiable Output", desc: "Only calculated payout amounts are revealed, not the inputs" },
+                { step: "4", title: "Automated Distribution", desc: "Smart contracts handle dividend claims automatically" }
+              ].map((item, index) => (
+                <div key={index} className="relative">
+                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-lg text-center">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold text-xl flex items-center justify-center mx-auto mb-4">
+                      {item.step}
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{item.title}</h3>
+                    <p className="text-gray-600 text-sm">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20 bg-gradient-to-r from-blue-600 to-purple-600">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl font-bold text-white mb-6">
+            Ready to Transform RWA Management?
+          </h2>
+          <p className="text-blue-100 text-xl mb-10">
+            Experience the power of confidential computing with iExec TEEs.
+            Your data deserves absolute privacy.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={isConnected ? undefined : login}
+              className="group px-8 py-4 bg-white text-blue-600 font-semibold rounded-xl hover:bg-gray-50 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            >
+              {isConnected ? "Dashboard Accessible" : "Get Started Now"}
+              {!isConnected && <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
+            </button>
+            
+            <Link
+              href="/admin"
+              className="px-8 py-4 bg-transparent text-white font-semibold rounded-xl border-2 border-white hover:bg-white/10 transition-all"
+            >
+              View Demo
+            </Link>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
