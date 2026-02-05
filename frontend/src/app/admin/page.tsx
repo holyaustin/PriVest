@@ -17,7 +17,7 @@ import {
 
 // Configuration
 const IAPP_ADDRESS = "0xB27cfF3fc965FaD42B5a97c350c9D9449Fd92D79";
-const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`;
+const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0xe4741b7FF9c69904A6616AD8a61937F97d947331") as `0x${string}`;
 
 interface Investor {
   address: string;
