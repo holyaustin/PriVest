@@ -17,7 +17,7 @@ import {
 
 // Configuration
 const IAPP_ADDRESS = "0xB27cfF3fc965FaD42B5a97c350c9D9449Fd92D79";
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}`;
+const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`;
 
 interface Investor {
   address: string;
@@ -232,11 +232,21 @@ const DISTRIBUTOR_ABI = [
   }
 ] as const;
 
-// Type-safe window.ethereum declaration
-declare global {
-  interface Window {
-    ethereum?: ethers.Eip1193Provider;
+// ✅ Safe type guard for Ethereum provider (NO global redeclaration)
+type SafeEip1193Provider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+
+function getEthereumProvider(): SafeEip1193Provider | null {
+  if (typeof window === "undefined") return null;
+
+  const eth = (window as any).ethereum;
+
+  if (!eth || typeof eth.request !== "function") {
+    return null;
   }
+
+  return eth as unknown as SafeEip1193Provider;
 }
 
 export default function AdminPortal() {
@@ -247,7 +257,7 @@ export default function AdminPortal() {
     { address: "", stake: "350000", name: "Strategic Partner B" },
     { address: "", stake: "250000", name: "Venture Fund C" },
   ]);
-  const [taskId, setTaskId] = useState<string>("");
+  const [taskId, setTaskId] = useState<`0x${string}`>("0x" as `0x${string}`);
   const [status, setStatus] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [recentTasks, setRecentTasks] = useState<any[]>([]);
@@ -275,21 +285,19 @@ export default function AdminPortal() {
   // Initialize iExec SDK when wallet connects
   useEffect(() => {
     const initializeIExec = async () => {
-      if (isConnected && window.ethereum) {
+      const provider = getEthereumProvider();
+      if (isConnected && provider) {
         try {
-          // Dynamically import iExec SDK with proper typing
-          const { IExec } = await import('iexec');
+          // Dynamically import iExec SDK
+          const { IExec } = await import("iexec");
           
-          // Create a proper EIP-1193 provider wrapper
-          const eip1193Provider = window.ethereum;
-          
-          const iexec = new IExec({ 
-            ethProvider: eip1193Provider 
+          const iexec = new IExec({
+            ethProvider: provider as any,
           });
           setIexecInstance(iexec);
           console.log("iExec SDK initialized successfully");
         } catch (error) {
-          console.warn("Could not load iExec SDK, using mock implementation:", error);
+          console.warn("iExec SDK unavailable, using mock:", error);
           setIexecInstance(createMockIExec());
         }
       }
@@ -308,22 +316,15 @@ export default function AdminPortal() {
       placeTaskOrder: async (order: any) => {
         console.log("[MOCK] Placing task order:", order);
         await new Promise(resolve => setTimeout(resolve, 1000));
+        const mockTaskId = `0x${Array.from({length: 64}, () => 
+          Math.floor(Math.random() * 16).toString(16)
+        ).join('')}` as `0x${string}`;
         return { 
-          taskId: `0x${Array.from({length: 64}, () => 
-            Math.floor(Math.random() * 16).toString(16)
-          ).join('')}`
+          taskId: mockTaskId
         };
       }
     }
   });
-
-  // Get a properly typed Ethereum provider
-  const getEthereumProvider = (): ethers.Eip1193Provider | undefined => {
-    if (typeof window !== 'undefined' && window.ethereum) {
-      return window.ethereum;
-    }
-    return undefined;
-  };
 
   // Fetch recent tasks from contract
   const fetchRecentTasks = async () => {
@@ -333,7 +334,9 @@ export default function AdminPortal() {
         throw new Error("No Ethereum provider available");
       }
 
-      const ethersProvider = new ethers.BrowserProvider(provider);
+      const ethersProvider = new ethers.BrowserProvider(
+        provider as unknown as ethers.Eip1193Provider
+      );
       const signer = await ethersProvider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, DISTRIBUTOR_ABI, signer);
       
@@ -400,7 +403,7 @@ export default function AdminPortal() {
   };
 
   const registerTaskInContract = () => {
-    if (!taskId) return;
+    if (!taskId || taskId === "0x") return;
     
     try {
       writeContract({
@@ -448,7 +451,7 @@ export default function AdminPortal() {
       // Place order on iExec
       setStatus("⏳ Submitting to iExec decentralized network...");
       const placedOrder = await iexec.task.placeTaskOrder(taskOrder);
-      const newTaskId = placedOrder.taskId;
+      const newTaskId = placedOrder.taskId as `0x${string}`;
       setTaskId(newTaskId);
       
       setStatus(`✅ Task launched! ID: ${newTaskId.slice(0, 10)}...`);
@@ -463,7 +466,7 @@ export default function AdminPortal() {
       if (error.message?.includes("mock") || !iexecInstance) {
         const mockTaskId = `0x${Array.from({length: 64}, () => 
           Math.floor(Math.random() * 16).toString(16)
-        ).join('')}`;
+        ).join('')}` as `0x${string}`;
         setTaskId(mockTaskId);
         setStatus(`✅ Demo Mode: Task simulation complete! ID: ${mockTaskId.slice(0, 10)}...`);
         registerTaskInContract();
@@ -700,7 +703,7 @@ export default function AdminPortal() {
                     </div>
                     <div className="flex-1">
                       <p className="font-medium text-gray-900 text-lg mb-1">{status.replace(/[✅❌⚠️]/g, '').trim()}</p>
-                      {taskId && (
+                      {taskId && taskId !== "0x" && (
                         <div className="mt-2">
                           <p className="text-sm text-gray-700 font-medium">Task ID:</p>
                           <code className="block mt-1 p-2 bg-white/50 rounded border border-gray-200 text-sm font-mono break-all">
@@ -789,7 +792,7 @@ export default function AdminPortal() {
                   </div>
                   <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <code className="text-sm font-mono text-gray-800 break-all">
-                      {CONTRACT_ADDRESS || "Not configured"}
+                      {CONTRACT_ADDRESS}
                     </code>
                   </div>
                 </div>
@@ -924,7 +927,7 @@ export default function AdminPortal() {
                 </button>
                 <button 
                   onClick={() => {
-                    setTaskId('');
+                    setTaskId("0x" as `0x${string}`);
                     setStatus('');
                     setProfit('1000000');
                     setInvestors([
