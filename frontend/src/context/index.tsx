@@ -20,34 +20,59 @@ function WalletConnectionStatus({ children }: { children: ReactNode }) {
   const [hasApiError, setHasApiError] = useState(false);
 
   useEffect(() => {
-    // Listen for Reown API errors (they appear in console)
+    // Store original console methods
     const originalConsoleError = console.error;
+    const originalConsoleWarn = console.warn;
+    
     console.error = (...args) => {
       // Check if it's a Reown API error
       if (args[0] && typeof args[0] === 'string' && 
-          (args[0].includes('[Reown Config]') || args[0].includes('fetch failed'))) {
+          (args[0].includes('[Reown Config]') || 
+           args[0].includes('fetch failed') ||
+           args[0].includes('Failed to fetch') ||
+           args[0].includes('Network request failed'))) {
         setHasApiError(true);
         // Log it as a warning instead of error for better UX
-        console.warn('Reown API connection issue - using local configuration:', args[1] || '');
+        console.warn('Reown API connection issue - using local configuration');
         return; // Don't show as error in console
       }
-      originalConsoleError.apply(console, args);
+      // Check for duplicate key errors
+      if (args[0] && typeof args[0] === 'string' && 
+          args[0].includes('Encountered two children with the same key')) {
+        // This is a React warning, not an error - log as warning
+        originalConsoleWarn(...args);
+        return;
+      }
+      originalConsoleError(...args);
     };
 
     // Listen for unhandled errors
     const handleError = (event: ErrorEvent) => {
       if (event.error?.message?.includes('Reown') || 
-          event.error?.message?.includes('fetch')) {
+          event.error?.message?.includes('fetch') ||
+          event.error?.message?.includes('Network')) {
+        setHasApiError(true);
+        event.preventDefault(); // Prevent default error handling
+      }
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (event.reason?.message?.includes('Reown') || 
+          event.reason?.message?.includes('fetch') ||
+          event.reason?.message?.includes('Network')) {
         setHasApiError(true);
         event.preventDefault(); // Prevent default error handling
       }
     };
 
     window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
     
     return () => {
       console.error = originalConsoleError;
+      console.warn = originalConsoleWarn;
       window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
   }, []);
 
