@@ -36,8 +36,10 @@ interface IExecTaskOrder {
 
 interface IExecInstance {
   task: {
-    createTaskOrder: (order: IExecTaskOrder) => Promise<Record<string, unknown>>;
-    placeTaskOrder: (order: Record<string, unknown>) => Promise<{ taskId: `0x${string}` }>;
+    createTaskorder?: (order: IExecTaskOrder) => Promise<Record<string, unknown>>;
+    createTaskOrder?: (order: IExecTaskOrder) => Promise<Record<string, unknown>>;
+    placeTaskorder?: (order: Record<string, unknown>) => Promise<{ taskid: `0x${string}` }>;
+    placeTaskOrder?: (order: Record<string, unknown>) => Promise<{ taskid: `0x${string}` }>;
   };
 }
 
@@ -313,14 +315,14 @@ export default function AdminPortal() {
         console.log("[MOCK] Creating task order:", order);
         return { ...order, mock: true };
       },
-      placeTaskOrder: async (order: Record<string, unknown>): Promise<{ taskId: `0x${string}` }> => {
+      placeTaskOrder: async (order: Record<string, unknown>): Promise<{ taskid: `0x${string}` }> => {
         console.log("[MOCK] Placing task order:", order);
         await new Promise(resolve => setTimeout(resolve, 1000));
         const mockTaskId = `0x${Array.from({length: 64}, () => 
           Math.floor(Math.random() * 16).toString(16)
         ).join('')}` as `0x${string}`;
         return { 
-          taskId: mockTaskId
+          taskid: mockTaskId
         };
       }
     }
@@ -338,8 +340,9 @@ export default function AdminPortal() {
           const iexec = new IExec({
             ethProvider: provider as unknown as ethers.Eip1193Provider,
           });
+          
+          console.log("iExec SDK initialized:", iexec);
           setIexecInstance(iexec as unknown as IExecInstance);
-          console.log("iExec SDK initialized successfully");
         } catch (error) {
           console.warn("iExec SDK unavailable, using mock:", error);
           setIexecInstance(createMockIExec());
@@ -368,7 +371,7 @@ export default function AdminPortal() {
       try {
         const owner = await contract.owner();
         console.log("Contract owner:", owner);
-      } catch  {
+      } catch {
         console.log("Could not fetch owner, contract might not be deployed yet");
       }
       
@@ -378,14 +381,14 @@ export default function AdminPortal() {
           id: "0x1234abcd5678efgh9012ijkl3456mnop", 
           status: "Completed", 
           amount: "$1,000,000", 
-          date: "2025-12-04",
+          date: "2024-02-04",
           txHash: "0x7890abcd1234efgh5678ijkl9012mnop"
         },
         { 
           id: "0x5678efgh9012ijkl3456mnop7890abcd", 
           status: "Processing", 
           amount: "$750,000", 
-          date: "2026-02-03",
+          date: "2024-02-03",
           txHash: "0x1234efgh5678ijkl9012mnop3456abcd"
         },
       ]);
@@ -481,9 +484,21 @@ export default function AdminPortal() {
       // Use either real iExec SDK or mock
       const iexec = iexecInstance || createMockIExec();
       
+      console.log("iExec instance:", iexec);
+      console.log("iExec.task methods:", Object.keys(iexec.task || {}));
+      
       // Create task order with callback to our contract
       setStatus("📋 Creating secure task order with iExec...");
-      const taskOrder = await iexec.task.createTaskOrder({
+      
+      // Handle different iExec SDK versions
+      const createTaskOrderFunc = iexec.task?.createTaskOrder || iexec.task?.createTaskorder;
+      const placeTaskOrderFunc = iexec.task?.placeTaskOrder || iexec.task?.placeTaskorder;
+      
+      if (!createTaskOrderFunc || !placeTaskOrderFunc) {
+        throw new Error("iExec SDK methods not available");
+      }
+      
+      const taskOrder = await createTaskOrderFunc({
         app: IAPP_ADDRESS,
         params: {
           callback: CONTRACT_ADDRESS,
@@ -493,9 +508,15 @@ export default function AdminPortal() {
 
       // Place order on iExec
       setStatus("⏳ Submitting to iExec decentralized network...");
-      const placedOrder = await iexec.task.placeTaskOrder(taskOrder);
-      const newTaskId = placedOrder.taskId;
-      setTaskId(newTaskId);
+      const placedOrder = await placeTaskOrderFunc(taskOrder);
+      
+      // Handle different response formats
+      const newTaskId = (placedOrder as any).taskid || (placedOrder as any).taskId;
+      if (!newTaskId) {
+        throw new Error("No task ID returned from iExec");
+      }
+      
+      setTaskId(newTaskId as `0x${string}`);
       
       setStatus(`✅ Task launched! ID: ${newTaskId.slice(0, 10)}...`);
       
