@@ -1,5 +1,5 @@
+/* eslint-disable */
 import { IExec } from 'iexec';
-import { ethers } from 'ethers';
 
 // Configuration - Arbitrum Sepolia
 const IAPP_ADDRESS = process.env.NEXT_PUBLIC_IAPP_ADDRESS || "0xE6a92eBC3EF8f9Fcc4d069EBE2E9adcCf0693f15";

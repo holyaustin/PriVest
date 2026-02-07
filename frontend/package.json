@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3014",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "prebuild": "echo 'Optional: Add checks here if needed'",
+    "build": "next build"
   },
   "dependencies": {
     "@iexec/dataprotector": "^2.0.0-beta.19",
@@ -27,7 +28,7 @@
     "wagmi": "^2.16.4"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
+    "@eslint/eslintrc": "^3.3.3",
     "@tailwindcss/postcss": "^4.1.12",
     "@types/node": "^24",
     "@types/react": "^19",

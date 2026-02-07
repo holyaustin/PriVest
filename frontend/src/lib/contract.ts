@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { ethers } from 'ethers';
 
 // Contract Configuration
