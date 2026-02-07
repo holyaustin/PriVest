@@ -433,7 +433,7 @@ export default function AdminPortal() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-white px-4">
+      <div className="min-h-screen  flex items-center justify-center bg-gradient-to-br from-gray-50 to-white px-4">
         <div className="text-center p-6 max-w-md w-full">
           <Shield className="w-16 h-16 md:w-20 md:h-20 text-gray-300 mx-auto mb-6" />
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">Admin Access Required</h2>
@@ -448,7 +448,7 @@ export default function AdminPortal() {
   return (
     <>
       {/* Toast Container */}
-      <div className="fixed top-4 right-4 z-50 w-full max-w-sm space-y-2">
+      <div className="fixed bg-blue-500 top-4 right-4 z-50 w-full max-w-sm space-y-2">
         {toasts.map(toast => (
           <div
             key={toast.id}
@@ -475,7 +475,7 @@ export default function AdminPortal() {
         ))}
       </div>
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+      <div className="min-h-screen bg-gradient-to-br from-sky-100 to-white">
         {/* Header */}
         <div className="bg-white border-b border-gray-100 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

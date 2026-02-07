@@ -270,13 +270,7 @@ export default function Header() {
             <div className="px-4 py-4">
               {/* Navigation Links */}
               <div className="space-y-2 mb-6">
-                <Link 
-                  href="/" 
-                  onClick={() => setShowMobileMenu(false)}
-                  className="block px-4 py-3 text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-lg transition-colors font-medium"
-                >
-                  Dashboard
-                </Link>
+
                 <Link 
                   href="/admin" 
                   onClick={() => setShowMobileMenu(false)}

@@ -298,3 +298,35 @@ NEXT_PUBLIC_CONTRACT_ADDRESS=0xe4741b7FF9c69904A6616AD8a61937F97d947331
 
 Check your contract events:
 Go to: https://sepolia.arbiscan.io/address/0xe4741b7FF9c69904A6616AD8a61937F97d947331
+
+
+
+  "investors": [
+    {
+      "address": "0x2c3b2B2325610a6814f2f822D0bF4DAB8CF16e16",
+      "stake": 0.04,
+      "name": "Primary Investor",
+      "metadata": {
+        "performanceScore": 95,
+        "investmentDate": "2026-01-15"
+      }
+    },
+    {
+      "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "stake": 0.35,
+      "name": "Secondary Investor",
+      "metadata": {
+        "performanceScore": 88,
+        "investmentDate": "2026-1-20"
+      }
+    },
+    {
+      "address": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "stake": 0.25,
+      "name": "Tertiary Investor",
+      "metadata": {
+        "performanceScore": 76,
+        "investmentDate": "2026-01-10"
+      }
+    }
+  ],
