@@ -1,69 +1,93 @@
-import { ethers, network } from "hardhat";
+import { ethers, run } from "hardhat";
 import * as fs from "fs";
 import * as path from "path";
+import * as dotenv from "dotenv";
+
+dotenv.config();
 
 async function main(): Promise<void> {
-  console.log("🚀 Deploying Confidential RWA Dividend Distributor");
-  console.log("==================================================");
+  console.log("🚀 Deploying PriVest RWA Dividend Distributor");
+  console.log("=============================================");
 
-  const [deployer] = await ethers.getSigners();
-  console.log(`📱 Deployer address: ${deployer.address}`);
-  console.log(`💰 Balance: ${ethers.formatEther(await ethers.provider.getBalance(deployer.address))} ETH`);
-  console.log(`🌐 Network: ${network.name}`);
-
-  console.log("\n🛠️  Compiling contract...");
-  const DistributorFactory = await ethers.getContractFactory("RWADividendDistributor");
+  // Get network info
+  const networkName = process.env.HARDHAT_NETWORK || "hardhat";
+  console.log(`🌐 Network: ${networkName}`);
   
-  console.log("📤 Deploying contract...");
+  // Get deployer
+  const [deployer] = await ethers.getSigners();
+  console.log(`📱 Deployer: ${deployer.address}`);
+  console.log(`💰 Balance: ${ethers.formatEther(await ethers.provider.getBalance(deployer.address))} ETH`);
+
+  console.log("\n📦 Deploying contract...");
+  const DistributorFactory = await ethers.getContractFactory("RWADividendDistributor");
   const distributor = await DistributorFactory.deploy();
   
-  console.log("⏳ Waiting for deployment confirmation...");
   await distributor.waitForDeployment();
-  
   const contractAddress = await distributor.getAddress();
-  console.log(`✅ Contract successfully deployed!`);
-  console.log(`📍 Contract address: ${contractAddress}`);
+  
+  console.log(`✅ Contract deployed!`);
+  console.log(`📍 Address: ${contractAddress}`);
   
   const deploymentTx = distributor.deploymentTransaction();
-  if (!deploymentTx) {
-    throw new Error("Deployment transaction not found");
+  if (deploymentTx) {
+    console.log(`📝 TX Hash: ${deploymentTx.hash}`);
+    
+    if (networkName === "arbitrum-sepolia") {
+      console.log(`🔗 Explorer: https://sepolia.arbiscan.io/address/${contractAddress}`);
+    }
   }
   
-  console.log(`📝 Transaction hash: ${deploymentTx.hash}`);
-  console.log(`⛽ Gas used: ${deploymentTx.gasLimit.toString()}`);
-  console.log(`🔗 Arbiscan URL: https://sepolia.arbiscan.io/address/${contractAddress}`);
-  
-  console.log("\n⏳ Waiting for 5 block confirmations...");
-  await deploymentTx.wait(5);
+  // Save deployment info
+  const deploymentsDir = path.join(__dirname, "../deployments");
+  if (!fs.existsSync(deploymentsDir)) {
+    fs.mkdirSync(deploymentsDir, { recursive: true });
+  }
   
   const deploymentInfo = {
-    network: network.name,
-    chainId: network.config.chainId,
+    network: networkName,
     contractAddress: contractAddress,
-    contractName: "RWADividendDistributor",
     deployer: deployer.address,
-    transactionHash: deploymentTx.hash,
-    deployTimestamp: new Date().toISOString(),
-    iAppAddress: "0xB27cfF3fc965FaD42B5a97c350c9D9449Fd92D79",
+    timestamp: new Date().toISOString(),
+    contractName: "RWADividendDistributor",
+    // iExec integration
+    iExecApp: "0xB27cfF3fc965FaD42B5a97c350c9D9449Fd92D79",
+    callbackFunction: "receiveResult(bytes32,bytes)",
     nextSteps: [
-      "Update frontend .env.local with contract address",
-      "Run interaction script to test basic functions",
-      "Test iApp callback integration"
+      "1. Fund contract with ETH for payouts",
+      "2. Update frontend with contract address",
+      "3. Launch iExec tasks with this contract as callback"
     ]
   };
   
-  const outputPath = path.join(__dirname, "../deployment-info.json");
+  const outputPath = path.join(deploymentsDir, `${networkName}-deployment.json`);
   fs.writeFileSync(outputPath, JSON.stringify(deploymentInfo, null, 2));
-  console.log(`\n📁 Deployment details saved to: ${outputPath}`);
+  console.log(`\n📁 Deployment info saved to: ${outputPath}`);
   
-  console.log("\n🎯 DEPLOYMENT COMPLETE - NEXT STEPS:");
-  console.log("=".repeat(50));
-  console.log(`1. Update your frontend .env.local file:`);
-  console.log(`   NEXT_PUBLIC_CONTRACT_ADDRESS=${contractAddress}`);
-  console.log(`\n2. Run interaction test:`);
-  console.log(`   npx hardhat run scripts/interact.ts --network arbitrum-sepolia`);
-  console.log(`\n3. When running iApp from frontend, set callback to:`);
-  console.log(`   ${contractAddress}`);
+  // Create .env example for frontend
+  const envExample = `# Frontend Configuration
+NEXT_PUBLIC_CONTRACT_ADDRESS=${contractAddress}
+NEXT_PUBLIC_CHAIN_ID=${networkName === "arbitrum-sepolia" ? "421614" : "31337"}
+NEXT_PUBLIC_RPC_URL=${networkName === "arbitrum-sepolia" ? "https://sepolia-rollup.arbitrum.io/rpc" : "http://localhost:8545"}
+
+# iExec Configuration
+NEXT_PUBLIC_IEXEC_APP_ADDRESS=0xB27cfF3fc965FaD42B5a97c350c9D9449Fd92D79
+NEXT_PUBLIC_IEXEC_WORKERPOOL=debug-v8-arbitrum-sepolia-testnet.main.pools.iexec.eth
+
+# Fund contract for payouts:
+# Send ETH to: ${contractAddress}
+`;
+  
+  const envPath = path.join(deploymentsDir, `${networkName}-.env.example`);
+  fs.writeFileSync(envPath, envExample);
+  console.log(`📄 Frontend .env.example saved to: ${envPath}`);
+  
+  console.log("\n🎯 Deployment Complete!");
+  console.log("=".repeat(40));
+  console.log(`Contract ready for iExec callbacks!`);
+  console.log(`\nTo receive iExec callbacks:`);
+  console.log(`1. Launch iExec task with callback: ${contractAddress}`);
+  console.log(`2. iExec will call receiveResult() automatically`);
+  console.log(`3. Investors can claim dividends`);
 }
 
 main().catch((error: Error) => {

@@ -1,0 +1,66 @@
+{
+  "blockchain": {
+    "investors": [
+      "0x2c3b2B2325610a6814f2f822D0bF4DAB8CF16e16",
+      "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+    ],
+    "amounts": [
+      "500000000000000",
+      "500000000000000",
+      "500000000000000"
+    ],
+    "resultHash": "0xc4b5258c19ea219de980b5ff406fb62a5f8539c289bcb0410c2382ac6fe571e6",
+    "callbackData": "0x000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000e0c4b5258c19ea219de980b5ff406fb62a5f8539c289bcb0410c2382ac6fe571e600000000000000000000000000000000000000000000000000000000000000030000000000000000000000002c3b2b2325610a6814f2f822d0bf4dab8cf16e1600000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c80000000000000000000000003c44cdddb6a900fa2b585dd299e03d12fa4293bc00000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000001c6bf526340000000000000000000000000000000000000000000000000000001c6bf526340000000000000000000000000000000000000000000000000000001c6bf52634000",
+    "totalPayoutWei": "1500000000000000",
+    "conversionRate": 0.0005
+  },
+  "calculation": {
+    "timestamp": "2026-02-07T01:46:44.353Z",
+    "taskId": "prod-test-1770428804",
+    "contractAddress": "0x5b4dCD6038a092d36afEB2e2C56A8201544c6eC1",
+    "totalProfitUSD": 0.01,
+    "investorCount": 3,
+    "currency": "USD",
+    "totalPayoutUSD": 3,
+    "allocationPercentage": 30000,
+    "tierDistribution": {
+      "base": 3
+    }
+  },
+  "payouts": [
+    {
+      "investor": "0x2c3b2B2325610a6814f2f822D0bF4DAB8CF16e16",
+      "name": "Primary Investor",
+      "stakeUSD": 0.04,
+      "baseShareUSD": 0,
+      "finalPayoutUSD": 1,
+      "finalPayoutWei": "500000000000000",
+      "finalPayoutETH": "0.0005",
+      "tier": "base",
+      "multiplier": 1
+    },
+    {
+      "investor": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "name": "Secondary Investor",
+      "stakeUSD": 0.35,
+      "baseShareUSD": 0.01,
+      "finalPayoutUSD": 1,
+      "finalPayoutWei": "500000000000000",
+      "finalPayoutETH": "0.0005",
+      "tier": "base",
+      "multiplier": 1
+    },
+    {
+      "investor": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "name": "Tertiary Investor",
+      "stakeUSD": 0.25,
+      "baseShareUSD": 0,
+      "finalPayoutUSD": 1,
+      "finalPayoutWei": "500000000000000",
+      "finalPayoutETH": "0.0005",
+      "tier": "base",
+      "multiplier": 1
+    }
+  ]
+}

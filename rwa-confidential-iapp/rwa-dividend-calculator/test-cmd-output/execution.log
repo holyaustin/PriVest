@@ -1,0 +1,132 @@
+[2026-02-07T01:02:17.872Z] [INFO] 🚀 Starting PriVest Confidential Dividend Calculator v1.0.0
+[2026-02-07T01:02:17.881Z] [INFO] Environment: production
+[2026-02-07T01:02:17.883Z] [INFO] Reading input data...
+[2026-02-07T01:02:17.886Z] [INFO] Input file loaded successfully (343 bytes)
+[2026-02-07T01:02:17.889Z] [INFO] Parsing input data...
+[2026-02-07T01:02:17.910Z] [INFO] Parsed 2 investors
+[2026-02-07T01:02:17.913Z] [INFO] Validating input (strict mode)...
+[2026-02-07T01:02:17.921Z] [INFO] ✅ Input validation passed (strict mode)
+[2026-02-07T01:02:17.926Z] [INFO] Total profit: 1000000 USD
+[2026-02-07T01:02:17.939Z] [INFO] Investor count: 2
+[2026-02-07T01:02:17.942Z] [INFO] Tier configuration: 5 tiers defined
+[2026-02-07T01:02:17.944Z] [INFO] Starting confidential calculation...
+[2026-02-07T01:02:17.957Z] [INFO] ✅ Confidential calculation completed
+[2026-02-07T01:02:17.959Z] [INFO] Total payout: 1130000 USD
+[2026-02-07T01:02:17.961Z] [INFO] Allocation: 113% of profits
+[2026-02-07T01:02:17.966Z] [INFO] Preparing blockchain callback data...
+[2026-02-07T01:02:17.969Z] [ERROR] ❌ CRITICAL ERROR: Cannot read properties of undefined (reading 'address')
+[2026-02-07T01:02:17.978Z] [ERROR] Stack trace: TypeError: Cannot read properties of undefined (reading 'address')
+    at file:///app/src/app.js:100:59
+    at Array.map (<anonymous>)
+    at main (file:///app/src/app.js:100:39)
+    at file:///app/src/app.js:260:3
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+[2026-02-07T01:02:17.985Z] [INFO] 📁 Error details written to: /iexec_out/error.json
+[2026-02-07T01:02:23.215Z] [INFO] 🚀 Starting PriVest Confidential Dividend Calculator v1.0.0
+[2026-02-07T01:02:23.220Z] [INFO] Environment: production
+[2026-02-07T01:02:23.225Z] [INFO] Reading input data...
+[2026-02-07T01:02:23.231Z] [INFO] Input file loaded successfully (343 bytes)
+[2026-02-07T01:02:23.233Z] [INFO] Parsing input data...
+[2026-02-07T01:02:23.249Z] [INFO] Parsed 2 investors
+[2026-02-07T01:02:23.251Z] [INFO] Validating input (strict mode)...
+[2026-02-07T01:02:23.270Z] [INFO] ✅ Input validation passed (strict mode)
+[2026-02-07T01:02:23.272Z] [INFO] Total profit: 1000000 USD
+[2026-02-07T01:02:23.276Z] [INFO] Investor count: 2
+[2026-02-07T01:02:23.281Z] [INFO] Tier configuration: 5 tiers defined
+[2026-02-07T01:02:23.287Z] [INFO] Starting confidential calculation...
+[2026-02-07T01:02:23.329Z] [INFO] ✅ Confidential calculation completed
+[2026-02-07T01:02:23.332Z] [INFO] Total payout: 1130000 USD
+[2026-02-07T01:02:23.333Z] [INFO] Allocation: 113% of profits
+[2026-02-07T01:02:23.341Z] [INFO] Preparing blockchain callback data...
+[2026-02-07T01:02:23.347Z] [ERROR] ❌ CRITICAL ERROR: Cannot read properties of undefined (reading 'address')
+[2026-02-07T01:02:23.354Z] [ERROR] Stack trace: TypeError: Cannot read properties of undefined (reading 'address')
+    at file:///app/src/app.js:100:59
+    at Array.map (<anonymous>)
+    at main (file:///app/src/app.js:100:39)
+    at file:///app/src/app.js:260:3
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+[2026-02-07T01:02:23.357Z] [INFO] 📁 Error details written to: /iexec_out/error.json
+[2026-02-07T01:03:17.025Z] [INFO] 🚀 Starting PriVest Confidential Dividend Calculator v1.0.0
+[2026-02-07T01:03:17.029Z] [INFO] Environment: production
+[2026-02-07T01:03:17.031Z] [INFO] Reading input data...
+[2026-02-07T01:03:17.034Z] [INFO] Input file loaded successfully (343 bytes)
+[2026-02-07T01:03:17.036Z] [INFO] Parsing input data...
+[2026-02-07T01:03:17.055Z] [INFO] Parsed 2 investors
+[2026-02-07T01:03:17.056Z] [INFO] Validating input (strict mode)...
+[2026-02-07T01:03:17.069Z] [INFO] ✅ Input validation passed (strict mode)
+[2026-02-07T01:03:17.071Z] [INFO] Total profit: 1000000 USD
+[2026-02-07T01:03:17.081Z] [INFO] Investor count: 2
+[2026-02-07T01:03:17.086Z] [INFO] Tier configuration: 5 tiers defined
+[2026-02-07T01:03:17.088Z] [INFO] Starting confidential calculation...
+[2026-02-07T01:03:17.101Z] [INFO] ✅ Confidential calculation completed
+[2026-02-07T01:03:17.105Z] [INFO] Total payout: 1130000 USD
+[2026-02-07T01:03:17.109Z] [INFO] Allocation: 113% of profits
+[2026-02-07T01:03:17.114Z] [INFO] Preparing blockchain callback data...
+[2026-02-07T01:03:17.120Z] [ERROR] ❌ CRITICAL ERROR: Cannot read properties of undefined (reading 'address')
+[2026-02-07T01:03:17.124Z] [ERROR] Stack trace: TypeError: Cannot read properties of undefined (reading 'address')
+    at file:///app/src/app.js:100:59
+    at Array.map (<anonymous>)
+    at main (file:///app/src/app.js:100:39)
+    at file:///app/src/app.js:260:3
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+[2026-02-07T01:03:17.134Z] [INFO] 📁 Error details written to: /iexec_out/error.json
+[2026-02-07T01:06:11.952Z] [INFO] 🚀 Starting PriVest Confidential Dividend Calculator v1.0.0
+[2026-02-07T01:06:11.958Z] [INFO] Environment: production
+[2026-02-07T01:06:11.963Z] [INFO] Reading input data...
+[2026-02-07T01:06:11.970Z] [INFO] Input file loaded successfully (343 bytes)
+[2026-02-07T01:06:11.976Z] [INFO] Parsing input data...
+[2026-02-07T01:06:12.008Z] [INFO] Parsed 2 investors
+[2026-02-07T01:06:12.011Z] [INFO] Validating input (strict mode)...
+[2026-02-07T01:06:12.021Z] [INFO] ✅ Input validation passed (strict mode)
+[2026-02-07T01:06:12.024Z] [INFO] Total profit: 1000000 USD
+[2026-02-07T01:06:12.033Z] [INFO] Investor count: 2
+[2026-02-07T01:06:12.039Z] [INFO] Tier configuration: 5 tiers defined
+[2026-02-07T01:06:12.040Z] [INFO] Starting confidential calculation...
+[2026-02-07T01:06:12.051Z] [INFO] ✅ Confidential calculation completed
+[2026-02-07T01:06:12.066Z] [INFO] Total payout: 1130000 USD
+[2026-02-07T01:06:12.068Z] [INFO] Allocation: 113% of profits
+[2026-02-07T01:06:12.070Z] [INFO] Preparing blockchain callback data...
+[2026-02-07T01:06:12.080Z] [ERROR] ❌ CRITICAL ERROR: Cannot read properties of undefined (reading 'address')
+[2026-02-07T01:06:12.090Z] [ERROR] Stack trace: TypeError: Cannot read properties of undefined (reading 'address')
+    at file:///app/src/app.js:100:59
+    at Array.map (<anonymous>)
+    at main (file:///app/src/app.js:100:39)
+    at file:///app/src/app.js:260:3
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+[2026-02-07T01:06:12.102Z] [INFO] 📁 Error details written to: /iexec_out/error.json
+[2026-02-07T01:29:58.560Z] [INFO] 🚀 Starting PriVest Confidential Dividend Calculator v1.0.0
+[2026-02-07T01:29:58.564Z] [INFO] Environment: production
+[2026-02-07T01:29:58.567Z] [INFO] Reading input data...
+[2026-02-07T01:29:58.571Z] [INFO] Input file loaded successfully (343 bytes)
+[2026-02-07T01:29:58.573Z] [INFO] Parsing input data...
+[2026-02-07T01:29:58.600Z] [INFO] Parsed 2 investors
+[2026-02-07T01:29:58.608Z] [INFO] Validating input (strict mode)...
+[2026-02-07T01:29:58.621Z] [INFO] ✅ Input validation passed (strict mode)
+[2026-02-07T01:29:58.626Z] [INFO] Total profit: 1000000 USD
+[2026-02-07T01:29:58.631Z] [INFO] Investor count: 2
+[2026-02-07T01:29:58.636Z] [INFO] Tier configuration: 5 tiers defined
+[2026-02-07T01:29:58.638Z] [INFO] Starting confidential calculation...
+[2026-02-07T01:29:58.655Z] [INFO] ✅ Confidential calculation completed
+[2026-02-07T01:29:58.657Z] [INFO] Total payout: 1130000 USD
+[2026-02-07T01:29:58.660Z] [INFO] Allocation: 113% of profits
+[2026-02-07T01:29:58.665Z] [INFO] Preparing blockchain callback data...
+[2026-02-07T01:29:58.671Z] [INFO] ✅ Extracted 2 investor addresses
+[2026-02-07T01:29:58.676Z] [INFO] Using USD to ETH conversion rate: 1 USD = 0.0005 ETH
+[2026-02-07T01:29:58.708Z] [INFO] ✅ Callback data prepared (578 bytes)
+[2026-02-07T01:29:58.710Z] [INFO] Result hash: 0x33716b75bcfaae786f50ef8e07a8ca4a168ca07af4ab8fe85fc33e67a8c5f2fb
+[2026-02-07T01:29:58.713Z] [INFO] Contract address: Not specified in input
+[2026-02-07T01:29:58.718Z] [INFO] ✅ computed.json written: /iexec_out/computed.json
+[2026-02-07T01:29:58.726Z] [INFO] ✅ result.json written: /iexec_out/result.json
+[2026-02-07T01:29:58.730Z] [INFO] 🎉 Calculation completed successfully!
+[2026-02-07T01:29:58.735Z] [INFO] 📊 Results: 2 payouts calculated
+[2026-02-07T01:29:58.742Z] [INFO] 💰 Total payout: 1130000 USD (565.0 ETH)
+[2026-02-07T01:29:58.747Z] [INFO] 🔗 Smart contract callback data ready for: contract address
+[2026-02-07T01:29:58.751Z] [INFO] 📤 Output files written to: /iexec_out

@@ -4,11 +4,18 @@
   "description": "",
   "main": "src/app.js",
   "type": "module",
+    "scripts": {
+    "test": "node scripts/test-local.js",
+    "test:production": "./scripts/test-production.sh",
+    "start": "node src/app.js"
+  },
   "dependencies": {
     "@iexec/dataprotector-deserializer": "^0.1.1",
     "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
+    "esm": "^3.2.25",
+    "ethers": "^6.16.0",
     "figlet": "^1.8.1",
     "uuid": "^13.0.0"
   },

@@ -1,9 +1,8 @@
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { InputParser } from './utils/inputParser.js';
 import { InputValidator } from './utils/validation.js';
 import { PayoutCalculator } from './models/Payout.js';
-import { OutputFormatter } from './utils/outputFormatter.js';
 import { TierConfig } from './config/tiers.js';
 import { Constants } from './config/constants.js';
 import { ethers } from 'ethers';
@@ -18,8 +17,7 @@ const log = (message, level = 'INFO') => {
   if (process.env.IEXEC_OUT) {
     try {
       const logPath = join(process.env.IEXEC_OUT, 'execution.log');
-      const existingLog = readFileSync(logPath, 'utf8').catch(() => '');
-      writeFileSync(logPath, `${existingLog}${logMessage}\n`);
+      writeFileSync(logPath, logMessage + '\n', { flag: 'a' });
     } catch (error) {
       // Silently fail if log file can't be written
     }
@@ -34,7 +32,7 @@ export default async function main() {
     log(`🚀 Starting ${Constants.APP_NAME} v${Constants.VERSION}`);
     log(`Environment: ${process.env.NODE_ENV || 'production'}`);
     
-    // --- 1. READ INPUT DATA ---
+    // --- 1. READ INPUT DATA (NO FALLBACKS) ---
     log('Reading input data...');
     const inputPath = process.env.IEXEC_IN || '/iexec_in';
     const inputFile = join(inputPath, 'input.json');
@@ -44,69 +42,43 @@ export default async function main() {
       inputData = JSON.parse(inputFileContent);
       log(`Input file loaded successfully (${inputFileContent.length} bytes)`);
     } catch (error) {
-      log(`Failed to read input file: ${error.message}`, 'ERROR');
-      
-      // Provide comprehensive fallback for demonstration
-      log('Using demonstration data...', 'WARN');
-      inputData = {
-        totalProfit: 1000000,
-        investors: [
-          {
-            address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
-            stake: 300000,
-            name: "Early Investor A",
-            metadata: { investmentDate: "2024-01-15", performanceScore: 85 }
-          },
-          {
-            address: "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B",
-            stake: 500000,
-            name: "Strategic Partner B",
-            metadata: { investmentDate: "2024-02-20", performanceScore: 92 }
-          },
-          {
-            address: "0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db",
-            stake: 200000,
-            name: "Venture Fund C",
-            metadata: { investmentDate: "2024-03-10", performanceScore: 78 }
-          }
-        ],
-        config: {
-          enablePerformanceBonus: true,
-          minPayout: 10,
-          roundingPrecision: 2,
-          currency: "USD"
-        },
-        metadata: {
-          calculationId: "demo-001",
-          purpose: "Hackathon demonstration"
-        }
-      };
+      log(`❌ CRITICAL: Failed to read input file: ${error.message}`, 'ERROR');
+      log(`Input file path: ${inputFile}`, 'ERROR');
+      throw new Error(`Input file not found or invalid. Users must provide investor addresses.`);
     }
     
-    // --- 2. PARSE AND VALIDATE INPUT ---
+    // --- 2. PARSE AND VALIDATE INPUT (STRICT VALIDATION) ---
     log('Parsing input data...');
     try {
       parsedInput = InputParser.parse(inputData);
       log(`Parsed ${parsedInput.investors.length} investors`);
     } catch (parseError) {
-      log(`Input parsing failed: ${parseError.message}`, 'ERROR');
-      throw parseError;
+      log(`❌ Input parsing failed: ${parseError.message}`, 'ERROR');
+      throw new Error(`Invalid input: ${parseError.message}. Please provide valid investor addresses.`);
     }
     
-    // Validate input
-    log('Validating input...');
+    // Strict validation - NO fallbacks
+    log('Validating input (strict mode)...');
     const validation = InputValidator.validateCompleteInput(parsedInput);
     if (!validation.isValid) {
-      log(`Validation failed: ${validation.errors.join('; ')}`, 'ERROR');
+      log(`❌ Validation failed: ${validation.errors.join('; ')}`, 'ERROR');
       throw new Error(`Input validation failed: ${validation.errors.join(', ')}`);
     }
-    log('Input validation passed ✓');
     
-    // --- 3. EXECUTE CONFIDENTIAL CALCULATION ---
-    log('Starting confidential calculation...');
+    // Additional validation: ensure all addresses are unique
+    const addresses = parsedInput.investors.map(inv => inv.address.toLowerCase());
+    const uniqueAddresses = new Set(addresses);
+    if (uniqueAddresses.size !== addresses.length) {
+      throw new Error('Duplicate investor addresses detected. Each investor must have a unique address.');
+    }
+    
+    log('✅ Input validation passed (strict mode)');
     log(`Total profit: ${parsedInput.totalProfit} ${parsedInput.config.currency}`);
     log(`Investor count: ${parsedInput.investors.length}`);
     log(`Tier configuration: ${TierConfig.tiers.length} tiers defined`);
+    
+    // --- 3. EXECUTE CONFIDENTIAL CALCULATION ---
+    log('Starting confidential calculation...');
     
     const calculator = new PayoutCalculator(
       parsedInput.totalProfit,
@@ -117,121 +89,169 @@ export default async function main() {
     const results = calculator.calculate();
     const summary = calculator.getSummary();
     
-    log('Confidential calculation completed ✓');
+    // DEBUG: Show results structure
+    console.log('\n=== DEBUG: CALCULATION RESULTS ===');
+    console.log('Results length:', results.length);
+    if (results.length > 0) {
+      console.log('Sample result keys:', Object.keys(results[0]));
+      console.log('Has investorAddress?', 'investorAddress' in results[0]);
+      console.log('Has investor?', 'investor' in results[0]);
+    }
+    
+    log('✅ Confidential calculation completed');
     log(`Total payout: ${summary.totalPayout} ${parsedInput.config.currency}`);
     log(`Allocation: ${summary.allocationPercentage}% of profits`);
     
-    // --- 4. FORMAT OUTPUTS FOR SMART CONTRACT CALLBACK ---
-    log('Formatting outputs for smart contract callback...');
+    // --- 4. PREPARE BLOCKCHAIN CALLBACK DATA ---
+    log('Preparing blockchain callback data...');
     
-    // Get blockchain-formatted output
-    const blockchainOutput = OutputFormatter.formatForBlockchain(results, summary);
+    // Extract investor addresses - SIMPLIFIED
+    // Based on PayoutCalculator.js, results have .investorAddress property
+    const investorAddresses = results.map(r => {
+      if (r.investorAddress) {
+        return r.investorAddress;
+      } else if (r.address) {
+        return r.address;
+      } else if (r.investor && typeof r.investor === 'string') {
+        return r.investor;
+      } else {
+        throw new Error(`Cannot extract address from result: ${JSON.stringify(r)}`);
+      }
+    });
     
-    // Extract arrays for ABI encoding
-    const investorAddresses = blockchainOutput.investors.map(inv => inv.address);
-    const payoutAmounts = blockchainOutput.investors.map(inv => inv.amount);
+    log(`✅ Extracted ${investorAddresses.length} investor addresses`);
+    console.log('First address:', investorAddresses[0]);
+    
+    // Convert USD amounts to wei for blockchain
+    const USD_TO_ETH_RATE = process.env.USD_TO_ETH_RATE ? 
+      parseFloat(process.env.USD_TO_ETH_RATE) : 0.0005;
+    
+    log(`Using USD to ETH conversion rate: 1 USD = ${USD_TO_ETH_RATE} ETH`);
+    
+    const payoutAmounts = results.map(r => {
+      const amountETH = r.finalPayout * USD_TO_ETH_RATE;
+      return ethers.parseUnits(amountETH.toFixed(18), 18);
+    });
     
     // Calculate result hash for verification
     const resultHash = ethers.keccak256(
-      ethers.AbiCoder.defaultAbiCoder().encode(
-        ['address[]', 'uint256[]'],
-        [investorAddresses, payoutAmounts]
+      ethers.solidityPacked(
+        ["bytes32", "bytes32"],
+        [
+          ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["address[]"], [investorAddresses])),
+          ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["uint256[]"], [payoutAmounts]))
+        ]
       )
     );
     
     // ABI-encode data for smart contract callback
-    // Format: (address[] investors, uint256[] amounts, bytes32 resultHash)
     const callbackData = ethers.AbiCoder.defaultAbiCoder().encode(
-      ['address[]', 'uint256[]', 'bytes32'],
+      ["address[]", "uint256[]", "bytes32"],
       [investorAddresses, payoutAmounts, resultHash]
     );
     
-    // Human-readable output (for logs/audit)
-    const humanOutput = OutputFormatter.formatForHuman(results, summary, parsedInput.config);
+    log(`✅ Callback data prepared (${callbackData.length} bytes)`);
+    log(`Result hash: ${resultHash}`);
+    log(`Contract address: ${inputData.metadata?.callbackAddress || 'Not specified in input'}`);
     
-    // --- 5. WRITE ALL OUTPUT FILES ---
+    // --- 5. WRITE OUTPUT FILES (iExec Protocol Requirements) ---
     const outputDir = process.env.IEXEC_OUT || '/iexec_out';
     
     if (!outputDir) {
       throw new Error('IEXEC_OUT environment variable not set');
     }
     
-    // CRITICAL: Write computed.json with callback data for iExec protocol
+    // Ensure output directory exists
+    mkdirSync(outputDir, { recursive: true });
+    
+    // ========== CRITICAL: iExec Protocol Required Files ==========
+    
+    // 1. computed.json - REQUIRED for iExec callback system
     const computedJson = {
       'deterministic-output-path': `${outputDir}/result.json`,
-      'callback-data': callbackData  // This triggers smart contract callback
+      'callback-data': callbackData
     };
     const computedJsonPath = join(outputDir, 'computed.json');
     writeFileSync(computedJsonPath, JSON.stringify(computedJson, null, 2));
-    log(`✅ Computed JSON written to: ${computedJsonPath}`);
+    log(`✅ computed.json written: ${computedJsonPath}`);
     
-    // Write main result file
-    const mainOutputPath = join(outputDir, 'result.json');
-    const finalResult = {
-      investors: blockchainOutput.investors,
-      resultHash: resultHash,
-      totalPayout: summary.totalPayout,
-      timestamp: new Date().toISOString()
+    // 2. result.json - Main result file referenced in computed.json
+    const totalPayoutWei = payoutAmounts.reduce((sum, amount) => sum + amount, 0n);
+    
+    const mainResult = {
+      // Blockchain data (will be sent to contract)
+      blockchain: {
+        investors: investorAddresses,
+        amounts: payoutAmounts.map(a => a.toString()),
+        resultHash: resultHash,
+        callbackData: callbackData,
+        totalPayoutWei: totalPayoutWei.toString(),
+        conversionRate: USD_TO_ETH_RATE
+      },
+      
+      // Human readable data (for verification)
+      calculation: {
+        timestamp: new Date().toISOString(),
+        taskId: process.env.IEXEC_TASK_ID || 'local-test',
+        contractAddress: inputData.metadata?.callbackAddress || process.env.IEXEC_CALLBACK || 'not-specified',
+        
+        // Input summary
+        totalProfitUSD: parsedInput.totalProfit,
+        investorCount: parsedInput.investors.length,
+        currency: parsedInput.config.currency,
+        
+        // Output summary
+        totalPayoutUSD: summary.totalPayout,
+        allocationPercentage: summary.allocationPercentage,
+        tierDistribution: summary.tierDistribution
+      },
+      
+      // Individual payouts (for audit) - FIXED
+      payouts: results.map((r, i) => ({
+        investor: r.investorAddress,  // FIXED: was r.investor.address
+        name: r.investorName || `Investor ${i + 1}`,  // FIXED: was r.investor.name
+        stakeUSD: r.originalStake,
+        baseShareUSD: r.baseShare,
+        finalPayoutUSD: r.finalPayout,
+        finalPayoutWei: payoutAmounts[i].toString(),
+        finalPayoutETH: ethers.formatUnits(payoutAmounts[i], 18),
+        tier: r.tier,
+        multiplier: r.multiplier
+      }))
     };
-    writeFileSync(mainOutputPath, JSON.stringify(finalResult, null, 2));
-    log(`Main result written to: ${mainOutputPath}`);
     
-    // Detailed report (for debugging)
-    const detailedReportPath = join(outputDir, 'detailed-report.json');
-    writeFileSync(detailedReportPath, JSON.stringify(humanOutput, null, 2));
-    log(`Detailed report written to: ${detailedReportPath}`);
+    const resultJsonPath = join(outputDir, 'result.json');
+    writeFileSync(resultJsonPath, JSON.stringify(mainResult, null, 2));
+    log(`✅ result.json written: ${resultJsonPath}`);
     
-    // Summary log
-    const summaryPath = join(outputDir, 'summary.txt');
-    const summaryText = `
-PriVest Confidential Calculation Summary
-========================================
-Calculation ID: ${inputData.metadata?.calculationId || 'N/A'}
-Timestamp: ${new Date().toISOString()}
-
-SMART CONTRACT CALLBACK READY
------------------------------
-- Callback data prepared: YES
-- Investor count: ${investorAddresses.length}
-- Total payout: ${summary.totalPayout} ${parsedInput.config.currency}
-- Result hash: ${resultHash}
-
-Input Summary:
-- Total Profit: ${parsedInput.totalProfit} ${parsedInput.config.currency}
-- Investor Count: ${parsedInput.investors.length}
-
-Output Summary:
-- Total Payout: ${summary.totalPayout} ${parsedInput.config.currency}
-- Allocation: ${summary.allocationPercentage}% of profits
-- Average Payout: ${(summary.totalPayout / parsedInput.investors.length).toFixed(2)}
-
-Tier Distribution:
-${Object.entries(summary.tierDistribution).map(([tier, count]) => `  ${tier}: ${count} investors`).join('\n')}
-
-Callback Data Length: ${callbackData.length} bytes
-    `.trim();
-    
-    writeFileSync(summaryPath, summaryText);
-    log(`Summary written to: ${summaryPath}`);
+    // 3. success.flag (indicates successful completion)
+    const successFlagPath = join(outputDir, 'success.flag');
+    writeFileSync(successFlagPath, 'COMPLETED_SUCCESSFULLY');
     
     // --- 6. FINALIZATION ---
-    log('✅ Calculation completed successfully!');
+    log('🎉 Calculation completed successfully!');
     log(`📊 Results: ${results.length} payouts calculated`);
-    log(`💰 Total payout: ${summary.totalPayout} ${parsedInput.config.currency}`);
-    log(`🔗 Smart contract callback data ready (${callbackData.length} bytes)`);
+    log(`💰 Total payout: ${summary.totalPayout} USD (${ethers.formatUnits(totalPayoutWei, 18)} ETH)`);
+    log(`🔗 Smart contract callback data ready for: ${inputData.metadata?.callbackAddress || 'contract address'}`);
+    log(`📤 Output files written to: ${outputDir}`);
     
+    // Return success data
     return {
       success: true,
       resultHash: resultHash,
       investorCount: results.length,
-      totalPayout: summary.totalPayout,
+      totalPayoutUSD: summary.totalPayout,
+      totalPayoutWei: totalPayoutWei.toString(),
+      totalPayoutETH: ethers.formatUnits(totalPayoutWei, 18),
       callbackDataSize: callbackData.length,
+      investors: investorAddresses,
+      amounts: payoutAmounts.map(a => a.toString()),
       timestamp: new Date().toISOString()
     };
     
   } catch (error) {
     // --- ERROR HANDLING ---
-    log(`❌ Critical error: ${error.message}`, 'ERROR');
+    log(`❌ CRITICAL ERROR: ${error.message}`, 'ERROR');
     log(`Stack trace: ${error.stack}`, 'ERROR');
     
     // Write error to output directory
@@ -240,27 +260,24 @@ Callback Data Length: ${callbackData.length} bytes
       const errorOutput = {
         success: false,
         error: error.message,
-        stack: error.stack,
         timestamp: new Date().toISOString(),
-        inputSummary: parsedInput ? {
-          investorCount: parsedInput.investors.length,
-          totalProfit: parsedInput.totalProfit
-        } : 'No input parsed'
+        inputFileExists: !!inputData,
+        investorsProvided: parsedInput?.investors?.length || 0
       };
       
       writeFileSync(errorPath, JSON.stringify(errorOutput, null, 2));
-      log(`Error details written to: ${errorPath}`);
+      log(`📁 Error details written to: ${errorPath}`);
     }
     
     // Re-throw for iExec to handle
-    throw error;
+    throw new Error(`iApp execution failed: ${error.message}`);
   }
 }
 
-// Handle command line execution
-if (require.main === module) {
+// Handle ES module command line execution
+if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(error => {
-    console.error('Fatal error:', error);
+    console.error('❌ Fatal error:', error.message);
     process.exit(1);
   });
 }

@@ -1,0 +1,40 @@
+{
+  "blockchain": {
+    "investors": [
+      "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+    ],
+    "amounts": [
+      "600000000000000000000"
+    ],
+    "resultHash": "0xcb6461d493c159c8e83a6799b63bf30ff7a25dc8afe109fc888b7e382de38062",
+    "callbackData": "0x000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a0cb6461d493c159c8e83a6799b63bf30ff7a25dc8afe109fc888b7e382de380620000000000000000000000000000000000000000000000000000000000000001000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000002086ac351052600000",
+    "totalPayoutWei": "600000000000000000000",
+    "conversionRate": 0.0005
+  },
+  "calculation": {
+    "timestamp": "2026-02-07T01:45:26.098Z",
+    "taskId": "local-test",
+    "contractAddress": "not-specified",
+    "totalProfitUSD": 1000000,
+    "investorCount": 1,
+    "currency": "USD",
+    "totalPayoutUSD": 1200000,
+    "allocationPercentage": 120,
+    "tierDistribution": {
+      "platinum": 1
+    }
+  },
+  "payouts": [
+    {
+      "investor": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "name": "Test Investor",
+      "stakeUSD": 1000000,
+      "baseShareUSD": 1000000,
+      "finalPayoutUSD": 1200000,
+      "finalPayoutWei": "600000000000000000000",
+      "finalPayoutETH": "600.0",
+      "tier": "platinum",
+      "multiplier": 1.2
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+[2026-02-07T01:45:26.097Z] [INFO] ✅ computed.json written: test-simple-output/computed.json
+[2026-02-07T01:45:26.098Z] [INFO] ✅ result.json written: test-simple-output/result.json
+[2026-02-07T01:45:26.099Z] [INFO] 🎉 Calculation completed successfully!
+[2026-02-07T01:45:26.099Z] [INFO] 📊 Results: 1 payouts calculated
+[2026-02-07T01:45:26.099Z] [INFO] 💰 Total payout: 1200000 USD (600.0 ETH)
+[2026-02-07T01:45:26.099Z] [INFO] 🔗 Smart contract callback data ready for: contract address
+[2026-02-07T01:45:26.100Z] [INFO] 📤 Output files written to: test-simple-output

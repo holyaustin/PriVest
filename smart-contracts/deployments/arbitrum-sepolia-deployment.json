@@ -1,0 +1,14 @@
+{
+  "network": "arbitrum-sepolia",
+  "contractAddress": "0x5b4dCD6038a092d36afEB2e2C56A8201544c6eC1",
+  "deployer": "0x2c3b2B2325610a6814f2f822D0bF4DAB8CF16e16",
+  "timestamp": "2026-02-06T22:25:41.027Z",
+  "contractName": "RWADividendDistributor",
+  "iExecApp": "0xB27cfF3fc965FaD42B5a97c350c9D9449Fd92D79",
+  "callbackFunction": "receiveResult(bytes32,bytes)",
+  "nextSteps": [
+    "1. Fund contract with ETH for payouts",
+    "2. Update frontend with contract address",
+    "3. Launch iExec tasks with this contract as callback"
+  ]
+}

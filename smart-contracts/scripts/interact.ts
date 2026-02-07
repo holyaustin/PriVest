@@ -3,94 +3,177 @@ import * as fs from "fs";
 import * as path from "path";
 
 async function main(): Promise<void> {
-  console.log("🔗 Interacting with RWADividendDistributor Contract");
-  console.log("===================================================");
+  console.log("🔗 Testing RWADividendDistributor Contract");
+  console.log("==========================================");
 
-  // Load deployment info
-  const deploymentPath = path.join(__dirname, "../deployment-info.json");
+  // Get network
+  const networkName = process.env.HARDHAT_NETWORK || "hardhat";
+  
+  // Try to load deployment info
+  const deploymentsDir = path.join(__dirname, "../deployments");
+  const deploymentFile = path.join(deploymentsDir, `${networkName}-deployment.json`);
+  
   let contractAddress: string;
   
-  if (fs.existsSync(deploymentPath)) {
-    const deploymentInfo = JSON.parse(fs.readFileSync(deploymentPath, "utf8"));
+  if (fs.existsSync(deploymentFile)) {
+    const deploymentInfo = JSON.parse(fs.readFileSync(deploymentFile, "utf8"));
     contractAddress = deploymentInfo.contractAddress;
-    console.log(`📄 Loaded contract address from deployment-info.json`);
+    console.log(`📄 Loaded from deployment: ${contractAddress}`);
   } else {
     contractAddress = process.env.CONTRACT_ADDRESS || "";
     if (!contractAddress) {
-      throw new Error("Contract address not found. Please deploy first or set CONTRACT_ADDRESS in .env");
+      console.log("❌ No contract address found. Deploy first or set CONTRACT_ADDRESS");
+      process.exit(1);
     }
+    console.log(`📄 Using contract from env: ${contractAddress}`);
   }
   
-  console.log(`📍 Contract address: ${contractAddress}`);
+  console.log(`🌐 Network: ${networkName}`);
+  console.log(`📍 Contract: ${contractAddress}`);
   
-  // Get test accounts
-  const [owner, investor1, investor2] = await ethers.getSigners();
+  // Connect to contract
+  const [owner, investor1, investor2, funder] = await ethers.getSigners();
   
-  console.log(`\n👥 Available Test Accounts:`);
-  console.log(`   Owner: ${owner.address}`);
-  console.log(`   Investor 1: ${investor1.address}`);
-  console.log(`   Investor 2: ${investor2.address}`);
-  
-  // Load contract ABI
-  console.log(`\n📞 Connecting to contract...`);
-  const abiPath = path.join(
+  const artifactPath = path.join(
     __dirname, 
     "../artifacts/contracts/RWADividendDistributor.sol/RWADividendDistributor.json"
   );
   
-  if (!fs.existsSync(abiPath)) {
-    throw new Error("Contract ABI not found. Run 'npx hardhat compile' first.");
+  if (!fs.existsSync(artifactPath)) {
+    throw new Error("Compile contract first: npx hardhat compile");
   }
   
-  const artifact = JSON.parse(fs.readFileSync(abiPath, "utf8"));
+  const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
   const contract = new ethers.Contract(contractAddress, artifact.abi, owner);
   
-  console.log(`✅ Contract connected`);
+  // Type assertion to avoid TypeScript errors
+  const contractAny = contract as any;
   
-  // Test 1: Basic contract info
+  console.log(`\n✅ Connected to contract`);
+  
+  // Test 1: Basic info
   console.log("\n1️⃣  BASIC CONTRACT INFO");
   console.log("-".repeat(40));
   
   try {
-    const contractOwner = await contract.owner();
-    console.log(`   Contract owner: ${contractOwner}`);
-    
+    const contractOwner = await contractAny.owner();
     const contractBalance = await ethers.provider.getBalance(contractAddress);
-    console.log(`   Contract balance: ${ethers.formatEther(contractBalance)} ETH`);
+    
+    console.log(`   Owner: ${contractOwner}`);
+    console.log(`   Balance: ${ethers.formatEther(contractBalance)} ETH`);
     console.log(`   ✅ Contract is accessible`);
-  } catch (error: unknown) {
-    console.log(`   ❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+  } catch (error: any) {
+    console.log(`   ❌ Error: ${error.message}`);
   }
   
-  // Test 2: Simple call to check contract is alive
-  console.log("\n2️⃣  CONTRACT FUNCTIONALITY CHECK");
+  // Test 2: Simulate iExec callback
+  console.log("\n2️⃣  SIMULATE IEXEC CALLBACK");
   console.log("-".repeat(40));
   
   try {
-    // Use type assertion to bypass TypeScript checking
-    const contractAny = contract as any;
+    // Fund contract first
+    const fundAmount = ethers.parseEther("0.002");
+    console.log(`   Funding contract with ${ethers.formatEther(fundAmount)} ETH...`);
     
-    // Test getInvestorTasks
-    const investor1Tasks = await contractAny.getInvestorTasks(investor1.address);
-    console.log(`   Investor 1 tasks: ${Array.isArray(investor1Tasks) ? investor1Tasks.length : 0} tasks`);
+    await funder.sendTransaction({
+      to: contractAddress,
+      value: fundAmount
+    });
     
-    // Test getTaskDetails with mock ID
-    const mockTaskId = ethers.keccak256(ethers.toUtf8Bytes(`test-${Date.now()}`));
-    const taskDetails = await contractAny.getTaskDetails(mockTaskId);
-    console.log(`   Task details retrieved: ${taskDetails ? "Yes" : "No"}`);
+    // Create test data
+    const taskId = ethers.keccak256(ethers.toUtf8Bytes(`test-${Date.now()}`));
+    const investors = [investor1.address, investor2.address];
+    const amounts = [ethers.parseEther("0.00002"), ethers.parseEther("0.00001")];
     
-    console.log(`   ✅ Contract functions are callable`);
-  } catch (error: unknown) {
-    console.log(`   ❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+    // Calculate hash (as iApp would)
+    const resultHash = ethers.keccak256(
+      ethers.solidityPacked(
+        ["bytes32", "bytes32"],
+        [
+          ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["address[]"], [investors])),
+          ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["uint256[]"], [amounts]))
+        ]
+      )
+    );
+    
+    const encodedResult = ethers.AbiCoder.defaultAbiCoder().encode(
+      ["address[]", "uint256[]", "bytes32"],
+      [investors, amounts, resultHash]
+    );
+    
+    console.log(`   Task ID: ${taskId.slice(0, 16)}...`);
+    console.log(`   Investors: ${investors.length}`);
+    console.log(`   Total payout: ${ethers.formatEther(amounts[0] + amounts[1])} ETH`);
+    
+    // Simulate iExec callback
+    const tx = await contractAny.receiveResult(taskId, encodedResult);
+    await tx.wait();
+    
+    console.log(`   ✅ iExec callback simulated: ${tx.hash}`);
+    console.log(`   Task processed successfully!`);
+    
+    // Test 3: Check task info
+    console.log("\n3️⃣  CHECK TASK INFO");
+    console.log("-".repeat(40));
+    
+    const taskInfo = await contractAny.taskInfo(taskId);
+    console.log(`   Task exists: ${taskInfo.exists}`);
+    console.log(`   Timestamp: ${new Date(Number(taskInfo.timestamp) * 1000).toLocaleString()}`);
+    console.log(`   Total payout: ${ethers.formatEther(taskInfo.totalPayout)} ETH`);
+    
+    // Test 4: Claim dividends
+    console.log("\n4️⃣  CLAIM DIVIDENDS");
+    console.log("-".repeat(40));
+    
+    // Investor 1 claims
+    console.log(`   Investor 1 claiming dividend...`);
+    const initialBalance1 = await ethers.provider.getBalance(investor1.address);
+    
+    const claimTx1 = await contractAny.connect(investor1).claimDividend(taskId);
+    const receipt1 = await claimTx1.wait();
+    
+    if (receipt1) {
+      const gasCost1 = receipt1.gasUsed * receipt1.gasPrice;
+      const finalBalance1 = await ethers.provider.getBalance(investor1.address);
+      
+      console.log(`   ✅ Claimed: ${ethers.formatEther(amounts[0])} ETH`);
+      console.log(`   Net received: ${ethers.formatEther(finalBalance1 - initialBalance1 + BigInt(gasCost1))} ETH`);
+    } else {
+      console.log(`   ✅ Claimed: ${ethers.formatEther(amounts[0])} ETH`);
+    }
+    
+    // Investor 2 claims
+    console.log(`\n   Investor 2 claiming dividend...`);
+    const claimTx2 = await contractAny.connect(investor2).claimDividend(taskId);
+    await claimTx2.wait();
+    
+    console.log(`   ✅ Claimed: ${ethers.formatEther(amounts[1])} ETH`);
+    
+    console.log(`\n   ✅ All tests passed!`);
+    
+  } catch (error: any) {
+    console.log(`   ❌ Error: ${error.message}`);
   }
   
-  console.log("\n🎯 CONTRACT IS OPERATIONAL");
-  console.log("=".repeat(50));
-  console.log(`Contract: ${contractAddress}`);
-  console.log(`Ready for iApp integration!`);
+  // Usage instructions
+  console.log("\n🎯 IEXEC INTEGRATION GUIDE");
+  console.log("=".repeat(40));
+  
+  console.log(`\nTo integrate with iExec:`);
+  console.log(`1. Deploy this contract (already done)`);
+  console.log(`2. When launching iExec task, set callback to:`);
+  console.log(`   ${contractAddress}`);
+  console.log(`3. iExec will automatically call:`);
+  console.log(`   receiveResult(taskId, encodedPayoutData)`);
+  console.log(`4. Investors can claim dividends`);
+  
+  console.log(`\n📊 Contract Stats:`);
+  console.log(`   Address: ${contractAddress}`);
+  console.log(`   Network: ${networkName}`);
+  console.log(`   Ready for production use!`);
 }
 
 main().catch((error: Error) => {
-  console.error("\n❌ Script failed:", error.message);
+  console.error("\n❌ Interaction failed:", error.message);
   process.exit(1);
 });

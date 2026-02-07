@@ -1,0 +1,7 @@
+[2026-02-07T01:46:44.352Z] [INFO] ✅ computed.json written: test-production-output/computed.json
+[2026-02-07T01:46:44.354Z] [INFO] ✅ result.json written: test-production-output/result.json
+[2026-02-07T01:46:44.354Z] [INFO] 🎉 Calculation completed successfully!
+[2026-02-07T01:46:44.355Z] [INFO] 📊 Results: 3 payouts calculated
+[2026-02-07T01:46:44.355Z] [INFO] 💰 Total payout: 3 USD (0.0015 ETH)
+[2026-02-07T01:46:44.355Z] [INFO] 🔗 Smart contract callback data ready for: 0x5b4dCD6038a092d36afEB2e2C56A8201544c6eC1
+[2026-02-07T01:46:44.355Z] [INFO] 📤 Output files written to: test-production-output

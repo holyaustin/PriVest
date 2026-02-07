@@ -1,0 +1,43 @@
+{
+  "totalProfit": 0.01,
+  "investors": [
+    {
+      "address": "0x2c3b2B2325610a6814f2f822D0bF4DAB8CF16e16",
+      "stake": 0.04,
+      "name": "Primary Investor",
+      "metadata": {
+        "performanceScore": 95,
+        "investmentDate": "2026-01-15"
+      }
+    },
+    {
+      "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "stake": 0.35,
+      "name": "Secondary Investor",
+      "metadata": {
+        "performanceScore": 88,
+        "investmentDate": "2026-1-20"
+      }
+    },
+    {
+      "address": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "stake": 0.25,
+      "name": "Tertiary Investor",
+      "metadata": {
+        "performanceScore": 76,
+        "investmentDate": "2026-01-10"
+      }
+    }
+  ],
+  "config": {
+    "enablePerformanceBonus": true,
+    "minPayout": 1,
+    "roundingPrecision": 2,
+    "currency": "USD"
+  },
+  "metadata": {
+    "calculationId": "prod-test-001",
+    "callbackAddress": "0x5b4dCD6038a092d36afEB2e2C56A8201544c6eC1",
+    "description": "Production test with real addresses"
+  }
+}

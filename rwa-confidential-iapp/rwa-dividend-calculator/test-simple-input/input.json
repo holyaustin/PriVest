@@ -1,0 +1,13 @@
+{
+  "totalProfit": 1000000,
+  "investors": [
+    {
+      "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "stake": 1000000,
+      "name": "Test Investor"
+    }
+  ],
+  "config": {
+    "currency": "USD"
+  }
+}

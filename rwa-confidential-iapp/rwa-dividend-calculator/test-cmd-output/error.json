@@ -1,0 +1,7 @@
+{
+  "success": false,
+  "error": "Cannot read properties of undefined (reading 'address')",
+  "timestamp": "2026-02-07T01:06:12.098Z",
+  "inputFileExists": true,
+  "investorsProvided": 2
+}

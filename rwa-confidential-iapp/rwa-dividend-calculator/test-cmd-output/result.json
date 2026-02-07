@@ -1,0 +1,54 @@
+{
+  "blockchain": {
+    "investors": [
+      "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+    ],
+    "amounts": [
+      "345000000000000000000",
+      "220000000000000000000"
+    ],
+    "resultHash": "0x33716b75bcfaae786f50ef8e07a8ca4a168ca07af4ab8fe85fc33e67a8c5f2fb",
+    "callbackData": "0x000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c033716b75bcfaae786f50ef8e07a8ca4a168ca07af4ab8fe85fc33e67a8c5f2fb0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb9226600000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c80000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000012b3d6381c95c4000000000000000000000000000000000000000000000000000bed1d0263d9f00000",
+    "totalPayoutWei": "565000000000000000000",
+    "conversionRate": 0.0005
+  },
+  "calculation": {
+    "timestamp": "2026-02-07T01:29:58.721Z",
+    "taskId": "local-test",
+    "contractAddress": "not-specified",
+    "totalProfitUSD": 1000000,
+    "investorCount": 2,
+    "currency": "USD",
+    "totalPayoutUSD": 1130000,
+    "allocationPercentage": 113,
+    "tierDistribution": {
+      "gold": 1,
+      "silver": 1
+    }
+  },
+  "payouts": [
+    {
+      "investor": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "name": "Investor 1",
+      "stakeUSD": 600000,
+      "baseShareUSD": 600000,
+      "finalPayoutUSD": 690000,
+      "finalPayoutWei": "345000000000000000000",
+      "finalPayoutETH": "345.0",
+      "tier": "gold",
+      "multiplier": 1.15
+    },
+    {
+      "investor": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "name": "Investor 2",
+      "stakeUSD": 400000,
+      "baseShareUSD": 400000,
+      "finalPayoutUSD": 440000,
+      "finalPayoutWei": "220000000000000000000",
+      "finalPayoutETH": "220.0",
+      "tier": "silver",
+      "multiplier": 1.1
+    }
+  ]
+}

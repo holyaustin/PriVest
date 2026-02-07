@@ -3,7 +3,7 @@ import { TierConfig, getTierForStake } from '../config/tiers.js';
 export class PayoutCalculator {
   constructor(totalProfit, investors, options = {}) {
     this.totalProfit = parseFloat(totalProfit);
-    this.investors = investors;
+    this.investors = investors; // Array of Investor objects
     this.options = {
       enablePerformanceBonus: options.enablePerformanceBonus !== false,
       minPayout: options.minPayout || 1,
@@ -30,7 +30,7 @@ export class PayoutCalculator {
       let finalPayout = baseShare * tier.multiplier;
       
       // Apply performance bonus if enabled (confidential logic)
-      if (this.options.enablePerformanceBonus && investor.metadata.performanceScore) {
+      if (this.options.enablePerformanceBonus && investor.metadata?.performanceScore) {
         const performanceBonus = this.calculatePerformanceBonus(
           investor.metadata.performanceScore,
           investor.stake
@@ -52,18 +52,19 @@ export class PayoutCalculator {
       // Round to specified precision
       finalPayout = this.round(finalPayout, this.options.roundingPrecision);
 
+      // Return structured result for blockchain
       return {
-        investor: investor.address,
+        investorAddress: investor.address, // Ethereum address for blockchain
+        investorName: investor.name || '',
+        investorObject: investor, // Keep original object for reference
         originalStake: investor.stake,
         baseShare: this.round(baseShare, this.options.roundingPrecision),
-        finalPayout: finalPayout,
+        finalPayout: finalPayout, // USD amount
         tier: tier.id,
+        tierName: tier.name,
         multiplier: tier.multiplier,
         effectiveBonus: this.round(effectiveBonus, 4),
-        metadata: {
-          name: investor.name,
-          ...investor.metadata
-        }
+        metadata: investor.metadata || {}
       };
     });
 
@@ -96,6 +97,10 @@ export class PayoutCalculator {
 
     // Validate each investor
     this.investors.forEach((investor, index) => {
+      if (!investor.validate) {
+        throw new Error(`Investor ${index + 1} is not a valid Investor object`);
+      }
+      
       const validation = investor.validate();
       if (!validation.isValid) {
         throw new Error(`Investor ${index + 1} validation failed: ${validation.errors.join(', ')}`);
@@ -112,13 +117,33 @@ export class PayoutCalculator {
       tierDistribution[result.tier] = (tierDistribution[result.tier] || 0) + 1;
     });
 
+    // Calculate total in wei for blockchain
+    const totalPayoutWei = this.results.reduce((sum, result) => {
+      // This is a placeholder - actual conversion happens in app.js
+      return sum + result.finalPayout;
+    }, 0);
+
     return {
       totalProfit: this.totalProfit,
       totalPayout: this.round(totalPayout, 2),
+      totalPayoutWei: totalPayoutWei,
       allocationPercentage: this.round(allocation, 2),
       investorCount: this.investors.length,
       tierDistribution,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      results: this.results // Include results for detailed reporting
+    };
+  }
+
+  // Helper method to get blockchain-ready data
+  getBlockchainData(usdToEthRate = 0.0005) {
+    const investorAddresses = this.results.map(r => r.investorAddress);
+    const payoutAmountsETH = this.results.map(r => r.finalPayout * usdToEthRate);
+    
+    return {
+      investorAddresses,
+      payoutAmountsETH,
+      usdToEthRate
     };
   }
 }
