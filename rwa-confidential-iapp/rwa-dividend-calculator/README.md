@@ -193,3 +193,22 @@ the project's [`Dockerfile`](./Dockerfile).
 > - make sure installed libraries can run within the base image
 > - do not try to replace the base image in the Dockerfile, this would lead to
 >   failing TEE transformation.
+
+
+
+found 0 vulnerabilities
+✔ Docker image built (sha256:e15321c1fa2e738066c2672e5f6a7fc064771d10b013c19c30f5e860bf02aa08) and tagged holyaustin/rwa-dividend-calculator:0.0.2
+✔ Pushed image holyaustin/rwa-dividend-calculator:0.0.2 on dockerhub
+✔ Pushed TEE image holyaustin/rwa-dividend-calculator:0.0.2-tee-scone-5.9.1-v16-prod-b3d879e67ba8 on dockerhub
+✔ TEE app deployed
+✔ App secret attached to the app
+✔ Deployment of your iApp completed successfully:
+  - Docker image: holyaustin/rwa-dividend-calculator:0.0.2-tee-scone-5.9.1-v16-prod-b3d879e67ba8
+  - iApp address: 0xE6a92eBC3EF8f9Fcc4d069EBE2E9adcCf0693f15
+
+╭───────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                   │
+│   Run iapp run 0xE6a92eBC3EF8f9Fcc4d069EBE2E9adcCf0693f15 to execute your iApp on an iExec TEE    │
+│   worker                                                                                          │
+│                                                                                                   │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────╯

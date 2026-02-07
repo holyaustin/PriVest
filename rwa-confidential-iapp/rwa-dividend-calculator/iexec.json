@@ -1,0 +1,18 @@
+{
+  "description": "PriVest Confidential RWA Dividend Calculator - Runs confidential profit calculations in TEE",
+  "version": "1.0.0",
+  "author": "PriVest Team",
+  "license": "MIT",
+  "tags": ["tee", "scone", "confidential", "rwa", "dividend", "privacy"],
+  "app": {
+    "owner": "0xYourWalletAddress",
+    "name": "PriVest-RWA-Calculator",
+    "type": "DOCKER",
+    "multiaddr": "docker.io/holyaustin/privest-iapp:latest",
+    "checksum": "0x",
+    "mrenclave": {}
+  },
+  "workpool": {
+    "category": "0"
+  }
+}
