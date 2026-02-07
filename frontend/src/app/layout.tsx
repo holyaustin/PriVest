@@ -5,10 +5,12 @@ import ContextProvider from "@/context";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
+// Use local fallback or disable font optimization
 const inter = Inter({ 
   subsets: ["latin"],
   variable: "--font-inter",
-  display: 'swap', // Improves font loading performance
+  display: "swap",
+  fallback: ['system-ui', 'arial']
 });
 
 export const metadata: Metadata = {
