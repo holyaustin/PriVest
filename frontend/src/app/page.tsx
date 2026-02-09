@@ -1,16 +1,87 @@
 "use client";
 
-import { useAppKit } from "@reown/appkit/react";
-import { useAccount } from "wagmi";
+import { useAccount } from "wagmi"; // Removed unused useAppKit import
 import Link from "next/link";
 import { ArrowRight, Shield, Lock, BarChart, Zap } from "lucide-react";
+import { useState, useEffect } from "react";
+
+// ⭐ Add TypeScript declaration for window.appKit
+declare global {
+  interface Window {
+    appKit?: {
+      open: (options?: { view?: string }) => void;
+    };
+  }
+}
 
 export default function LandingPage() {
-  const { open } = useAppKit();
+  // ⭐ FIX: Initialize AppKit safely
+  const [appKitInitialized, setAppKitInitialized] = useState(false);
+  const [openFunction, setOpenFunction] = useState<((options?: { view?: string }) => void) | null>(null);
+  
   const { isConnected } = useAccount();
 
-  const login = () => open({ view: "Connect" });
+  useEffect(() => {
+    // Initialize AppKit only once on mount
+    if (typeof window !== 'undefined') {
+      try {
+        // ⭐ Check if appKit exists on window
+        if (window.appKit && typeof window.appKit.open === 'function') {
+          setOpenFunction(() => window.appKit!.open);
+          setAppKitInitialized(true);
+        } else {
+          // If not found, try to import and initialize
+          import("@/config/wagmiConfig").then((module) => {
+            // ⭐ Check if initializeAppKit exists and call it correctly
+            if (module.initializeAppKit) {
+              const appKit = module.initializeAppKit();
+              if (appKit && typeof appKit.open === 'function') {
+                setOpenFunction(() => appKit.open);
+                setAppKitInitialized(true);
+              } else {
+                setAppKitInitialized(true); // Continue anyway
+              }
+            } else {
+              setAppKitInitialized(true); // Continue anyway
+            }
+          }).catch(() => {
+            // Fallback: app will still work, just wallet connect won't
+            setAppKitInitialized(true);
+          });
+        }
+      } catch (error) {
+        console.warn("AppKit initialization failed:", error);
+        setAppKitInitialized(true); // Continue anyway
+      }
+    }
+  }, []);
 
+  const login = () => {
+    if (openFunction) {
+      // ⭐ Call with proper arguments
+      openFunction({ view: "Connect" });
+    } else if (typeof window !== 'undefined' && window.appKit && typeof window.appKit.open === 'function') {
+      window.appKit.open({ view: "Connect" });
+    } else {
+      console.error("Wallet not available");
+      // Fallback: redirect to admin page which might have wallet initialized
+      window.location.href = "/admin";
+    }
+  };
+
+  // ⭐ SHOW LOADING STATE IF NEEDED
+  if (!appKitInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Initializing wallet...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ⭐ REST OF YOUR CODE STAYS EXACTLY THE SAME
   const features = [
     {
       icon: <Shield className="w-8 h-8" />,

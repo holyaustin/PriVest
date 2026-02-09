@@ -6,9 +6,22 @@ import { useAccount, useDisconnect, useChainId, useSwitchChain } from "wagmi";
 import wagmiNetworks from "@/config/wagmiNetworks";
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown, LogOut, Wallet, Network, Menu, X } from "lucide-react";
+import { initializeAppKit } from "@/config/wagmiConfig"; // ⭐ ADD THIS IMPORT
 
 export default function Header() {
-  const { open } = useAppKit();
+  // ⭐ INITIALIZE AppKit before using the hook
+  const [appKitInitialized, setAppKitInitialized] = useState(false);
+  
+  // ⭐ Initialize AppKit on mount
+  useEffect(() => {
+    // This ensures createAppKit is called before useAppKit
+    initializeAppKit();
+    setAppKitInitialized(true);
+  }, []);
+
+  // ⭐ Only call useAppKit after initialization
+  const { open } = appKitInitialized ? useAppKit() : { open: () => {} };
+  
   const { disconnectAsync } = useDisconnect();
   const { isConnected, address } = useAccount();
   const chainId = useChainId();
@@ -23,7 +36,18 @@ export default function Header() {
   const networks = Object.values(wagmiNetworks);
   const currentNetwork = networks.find(network => network.id === chainId);
 
-  const login = () => open({ view: "Connect" });
+  const login = () => {
+    if (appKitInitialized) {
+      open({ view: "Connect" });
+    } else {
+      console.error("AppKit not initialized yet");
+      // Fallback: try to initialize and open
+      const appKit = initializeAppKit();
+      if (appKit) {
+        appKit.open({ view: "Connect" });
+      }
+    }
+  };
 
   const logout = async () => {
     try {
@@ -69,8 +93,41 @@ export default function Header() {
     setShowMobileMenu(!showMobileMenu);
   };
 
+  // ⭐ If AppKit not initialized, show loading or fallback
+  if (!appKitInitialized) {
+    return (
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <Link href="/" className="flex items-center space-x-2 lg:space-x-3 shrink-0">
+              <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
+                <span className="text-white font-bold text-lg lg:text-xl">P</span>
+              </div>
+              <div className="hidden sm:block">
+                <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  PriVest
+                </h1>
+                <p className="text-xs text-gray-500">Confidential RWA Manager</p>
+              </div>
+            </Link>
+            
+            {/* Loading state for Connect button */}
+            <div className="hidden md:block">
+              <button className="px-6 py-2.5 bg-gray-200 text-gray-500 font-medium rounded-lg cursor-not-allowed">
+                Initializing Wallet...
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
+      {/* ⭐ REST OF YOUR EXISTING CODE HERE - NO CHANGES NEEDED */}
+      {/* Keep all the existing JSX exactly as it was */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo and Navigation */}
@@ -89,12 +146,6 @@ export default function Header() {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-6">
-              <Link 
-                href="/" 
-                className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors whitespace-nowrap"
-              >
-                Dashboard
-              </Link>
               <Link 
                 href="/admin" 
                 className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors whitespace-nowrap"
@@ -270,7 +321,6 @@ export default function Header() {
             <div className="px-4 py-4">
               {/* Navigation Links */}
               <div className="space-y-2 mb-6">
-
                 <Link 
                   href="/admin" 
                   onClick={() => setShowMobileMenu(false)}

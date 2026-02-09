@@ -7,7 +7,7 @@ import {
 export { arbitrumSepolia, arbitrum } from '@reown/appkit/networks';
 
 export const bellecour: AppKitNetwork = {
-  id: 0x86,
+  id: 134, // Decimal format
   name: 'iExec Sidechain',
   nativeCurrency: {
     decimals: 18,
@@ -27,17 +27,11 @@ export const bellecour: AppKitNetwork = {
   },
 };
 
-// Explorer slugs mapping for iExec explorer
-export const explorerSlugs: Record<number, string> = {
-  134: 'bellecour', // iExec Sidechain (Bellecour)
-  42161: 'arbitrum-mainnet', // Arbitrum One
-  421614: 'arbitrum-sepolia-testnet', // Arbitrum Sepolia
-};
-
+// ⭐ CRITICAL CHANGE: Arbitrum Sepolia FIRST for default
 const wagmiNetworks = {
-  bellecour,
-  arbitrumSepolia,
-  arbitrum,
+  arbitrumSepolia, // ✅ FIRST = Default (id: 421614)
+  arbitrum,        // id: 42161
+  bellecour,       // id: 134
 };
 
 export default wagmiNetworks;

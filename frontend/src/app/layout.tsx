@@ -13,10 +13,18 @@ const inter = Inter({
   fallback: ['system-ui', 'arial']
 });
 
+// ✅ FIX 1: Separate viewport export (Next.js 15 requirement)
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
+// ✅ FIX 2: Remove viewport from metadata
 export const metadata: Metadata = {
   title: "PriVest | Confidential RWA Dividend Manager",
   description: "Privacy-preserving Real-World Asset management platform using iExec TEE technology. Built for Hack4Privacy Hackathon.",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=5",
+  // ❌ REMOVED: viewport property
 };
 
 export default function RootLayout({

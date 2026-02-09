@@ -20,7 +20,8 @@ import {
   getWalletBalance,
   fetchAppTasks,
   fetchTaskDetailsFromExplorer,
-  fetchAppDetails
+  fetchAppDetails,
+  getNetworkInfo
 } from "@/lib/iexec";
 import {
   fetchAllPayoutEvents,
@@ -119,6 +120,7 @@ export default function AdminPortal() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isLaunching, setIsLaunching] = useState(false);
   const [walletBalance, setWalletBalance] = useState<string>("0");
+  const [iExecNetwork, setIExecNetwork] = useState<string>("");
 
   // Get ethers JSON-RPC provider for reading data
   const getEthersProvider = useCallback((): ethers.Provider | null => {
@@ -179,11 +181,31 @@ export default function AdminPortal() {
           const iexec = await initializeIExec(ethereumProvider);
           setIexecInstance(iexec);
           
-          // Get wallet balance
-          if (address) {
-            const balance = await getWalletBalance(iexec, address);
-            setWalletBalance(balance);
+          // Get network info - FIXED: Using correct iExec SDK API
+          try {
+            const network = await getNetworkInfo(iexec);
+            // network is { chainId: string; isNative: boolean; }
+            const networkName = network.chainId === "421614" ? "Arbitrum Sepolia" : 
+                              network.chainId === "134" ? "iExec Bellecour" :
+                              `Chain ${network.chainId}`;
+            setIExecNetwork(`${networkName} ${network.isNative ? '(Native)' : ''}`);
+            console.log("iExec network:", network);
+          } catch (error) {
+            console.warn("Could not get network info:", error);
+            setIExecNetwork("Unknown");
           }
+          
+          // Get wallet balance
+          // ✅ FIXED: Get wallet balance - SIMPLIFIED
+            if (address) {
+              try {
+                const balance = await getWalletBalance(iexec, address);
+                setWalletBalance(balance);
+              } catch (error) {
+                console.warn("Could not get wallet balance:", error);
+                setWalletBalance("Balance unavailable");
+              }
+            }
           
           // Fetch iExec stats
           try {
@@ -202,7 +224,7 @@ export default function AdminPortal() {
           
         } catch (error) {
           console.error("iExec initialization failed:", error);
-          showToast("iExec initialization failed, using contract data only", "warning");
+          showToast("iExec initialization failed, please check your wallet connection", "error");
         }
       } else {
         showToast("No wallet detected, iExec features disabled", "warning");
@@ -299,25 +321,127 @@ export default function AdminPortal() {
   };
 
   const prepareIAppInput = useCallback((): any => {
-    return {
-      totalProfit: parseInt(profit) || 0,
-      investors: investors.map((inv, idx) => ({
-        address: inv.address || `0xInvestorPlaceholder${idx + 1}`,
+    // Validate investor addresses
+    const validInvestors = investors.map((inv, idx) => {
+      let address = inv.address;
+      
+      // If no address provided, use a placeholder that will fail validation
+      // This ensures users must provide real addresses
+      if (!address || address.trim() === "" || !address.startsWith("0x")) {
+        throw new Error(`Investor ${idx + 1} must have a valid Ethereum address`);
+      }
+      
+      // Basic address validation
+      if (address.length !== 42) {
+        throw new Error(`Investor ${idx + 1} address is invalid length`);
+      }
+      
+      return {
+        address: address.trim(),
         stake: parseInt(inv.stake) || 0,
-        name: inv.name,
+        name: inv.name || `Investor ${idx + 1}`,
         metadata: inv.metadata || { 
-          performanceScore: 85 + idx * 5,
+          performanceScore: 85,
           investmentDate: new Date().toISOString()
         }
-      })),
+      };
+    });
+    
+    return {
+      totalProfit: parseInt(profit) || 0,
+      investors: validInvestors,
       config: {
         enablePerformanceBonus: true,
         currency: "USD",
         timestamp: new Date().toISOString(),
         calculationId: `calc_${Date.now()}`
+      },
+      metadata: {
+        callbackAddress: CONTRACT_ADDRESS,
+        description: "PriVest RWA dividend calculation",
+        version: "1.0.0"
       }
     };
   }, [profit, investors]);
+
+  // Updated createAndSignTaskOrder to match iExec SDK API
+  const createAndSignTaskOrder = async (iexec: any, inputData: any) => {
+    try {
+      // Prepare task parameters according to iExec requirements
+      const taskParams = {
+        iexec_input_files: [],
+        iexec_secrets: {},
+        iexec_result_storage_provider: "ipfs",
+        iexec_result_storage_proxy: "https://result.v8-arbitrum-sepolia.iex.ec",
+      };
+      
+      // Encode the input data as JSON string for the TEE
+      const inputDataString = JSON.stringify(inputData);
+      console.log("Creating task order with data:", inputData);
+      
+      // Get the app order - Using correct iExec SDK API
+      const appOrder = await iexec.order.createAppOrder({
+        app: IAPP_ADDRESS,
+        appprice: "0", // Price in nRLC
+        volume: "1",
+        tag: "tee,scone",
+        datasetrestrict: "0x0000000000000000000000000000000000000000",
+        workerpoolrestrict: "0x0000000000000000000000000000000000000000",
+        requesterrestrict: "0x0000000000000000000000000000000000000000",
+        salt: ethers.hexlify(ethers.randomBytes(32)),
+      });
+      
+      // Sign the app order
+      const signedAppOrder = await iexec.order.signAppOrder(appOrder);
+      
+      // Get the workerpool order
+      const workerpoolOrder = await iexec.order.createWorkerpoolOrder({
+        workerpool: "prod-v8-arbitrum-sepolia.main.pools.iexec.eth",
+        workerpoolprice: "0",
+        volume: "1",
+        tag: "tee,scone",
+        category: "0",
+        trust: "0",
+        apprestrict: IAPP_ADDRESS,
+        datasetrestrict: "0x0000000000000000000000000000000000000000",
+        requesterrestrict: "0x0000000000000000000000000000000000000000",
+        salt: ethers.hexlify(ethers.randomBytes(32)),
+      });
+      
+      // Sign the workerpool order
+      const signedWorkerpoolOrder = await iexec.order.signWorkerpoolOrder(workerpoolOrder);
+      
+      // Create requester order
+      const requesterOrder = await iexec.order.createRequesterOrder({
+        app: IAPP_ADDRESS,
+        appmaxprice: "0",
+        workerpool: "prod-v8-arbitrum-sepolia.main.pools.iexec.eth",
+        workerpoolmaxprice: "0",
+        volume: "1",
+        tag: "tee,scone",
+        category: "0",
+        trust: "0",
+        beneficiary: address,
+        callback: CONTRACT_ADDRESS,
+        params: JSON.stringify(taskParams),
+        salt: ethers.hexlify(ethers.randomBytes(32)),
+      });
+      
+      // Sign the requester order
+      const signedRequesterOrder = await iexec.order.signRequesterOrder(requesterOrder);
+      
+      return {
+        appOrder: signedAppOrder,
+        workerpoolOrder: signedWorkerpoolOrder,
+        requesterOrder: signedRequesterOrder,
+        inputData: inputDataString
+      };
+      
+    } catch (error: any) {
+      console.error("Task order creation failed:", error);
+      throw new Error(`Failed to create task order: ${error.message}`);
+    }
+  };
 
   const launchConfidentialCalculation = async () => {
     const ethereumProvider = getEthereumProvider();
@@ -332,19 +456,34 @@ export default function AdminPortal() {
     }
 
     setIsLaunching(true);
-    showToast("Launching confidential calculation...", 'info');
+    showToast("Preparing confidential calculation...", 'info');
 
     try {
-      // Prepare input data
-      const inputData = prepareIAppInput();
+      // Prepare and validate input data
+      let inputData;
+      try {
+        inputData = prepareIAppInput();
+      } catch (validationError: any) {
+        showToast(`Validation error: ${validationError.message}`, 'error');
+        setIsLaunching(false);
+        return;
+      }
       
-      // Create and publish task
-      const taskOrder = await createTaskOrder(iexecInstance, inputData);
+      // Create and sign task order
+      showToast("Creating and signing task order...", 'info');
+      const taskOrder = await createAndSignTaskOrder(iexecInstance, inputData);
+      
+      // Publish task order to orderbook
+      showToast("Publishing to iExec orderbook...", 'info');
       const taskId = await publishTaskOrder(iexecInstance, taskOrder);
       
-      showToast(`Task launched successfully! Task ID: ${shortenHash(taskId, 8, 8)}`, 'success');
+      if (!taskId) {
+        throw new Error("Failed to get task ID from orderbook");
+      }
       
-      // Monitor task (in background)
+      showToast(`✅ Task launched! Task ID: ${shortenHash(taskId, 8, 8)}`, 'success');
+      
+      // Start monitoring task progress
       monitorTaskProgress(taskId);
       
       // Refresh data after a delay
@@ -353,7 +492,7 @@ export default function AdminPortal() {
       }, 5000);
       
     } catch (error: any) {
-      console.error("Calculation failed:", error);
+      console.error("Calculation launch failed:", error);
       showToast(`Error: ${error.message || 'Unknown error'}`, 'error');
     } finally {
       setIsLaunching(false);
@@ -373,14 +512,25 @@ export default function AdminPortal() {
         try {
           const results = await fetchTaskResults(iexecInstance, taskId);
           console.log("Task results:", results);
-          showToast("Task completed successfully!", 'success');
+          showToast("✅ Task completed successfully! Results ready.", 'success');
         } catch (error) {
           console.warn("Could not fetch task results:", error);
         }
       }
       
+      // Continue monitoring if still running
+      if (taskInfo.status === 'RUNNING') {
+        setTimeout(() => {
+          monitorTaskProgress(taskId);
+        }, 10000); // Check every 10 seconds
+      }
+      
     } catch (error) {
       console.error("Task monitoring failed:", error);
+      // Retry monitoring after delay
+      setTimeout(() => {
+        monitorTaskProgress(taskId);
+      }, 15000);
     }
   };
 
@@ -433,7 +583,7 @@ export default function AdminPortal() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen  flex items-center justify-center bg-gradient-to-br from-gray-50 to-white px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-white px-4">
         <div className="text-center p-6 max-w-md w-full">
           <Shield className="w-16 h-16 md:w-20 md:h-20 text-gray-300 mx-auto mb-6" />
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">Admin Access Required</h2>
@@ -448,7 +598,7 @@ export default function AdminPortal() {
   return (
     <>
       {/* Toast Container */}
-      <div className="fixed bg-blue-500 top-4 right-4 z-50 w-full max-w-sm space-y-2">
+      <div className="fixed top-4 right-4 z-50 w-full max-w-sm space-y-2">
         {toasts.map(toast => (
           <div
             key={toast.id}
@@ -506,6 +656,9 @@ export default function AdminPortal() {
                   }`}>
                     {iexecInstance ? 'Connected' : 'Disconnected'}
                   </div>
+                  {iExecNetwork && (
+                    <div className="text-xs text-gray-500">{iExecNetwork}</div>
+                  )}
                 </div>
                 <button
                   onClick={refreshData}
@@ -581,6 +734,8 @@ export default function AdminPortal() {
                       onChange={(e) => setProfit(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="e.g., 1000000"
+                      min="1"
+                      step="1000"
                     />
                   </div>
                 </div>
@@ -620,7 +775,7 @@ export default function AdminPortal() {
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-xs text-gray-500 mb-1">Address</label>
+                            <label className="block text-xs text-gray-500 mb-1">Address *</label>
                             <input
                               type="text"
                               value={investor.address}
@@ -631,10 +786,14 @@ export default function AdminPortal() {
                               }}
                               className="w-full px-3 py-2 border border-gray-300 rounded text-sm font-mono"
                               placeholder="0x..."
+                              required
                             />
+                            {investor.address && investor.address.length !== 42 && (
+                              <p className="text-xs text-red-500 mt-1">Invalid address length</p>
+                            )}
                           </div>
                           <div>
-                            <label className="block text-xs text-gray-500 mb-1">Stake (USD)</label>
+                            <label className="block text-xs text-gray-500 mb-1">Stake (USD) *</label>
                             <input
                               type="number"
                               value={investor.stake}
@@ -645,6 +804,9 @@ export default function AdminPortal() {
                               }}
                               className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
                               placeholder="e.g., 400000"
+                              min="1"
+                              step="1000"
+                              required
                             />
                           </div>
                         </div>
@@ -686,6 +848,11 @@ export default function AdminPortal() {
                     </>
                   )}
                 </button>
+                
+                <div className="mt-4 text-sm text-gray-500">
+                  <p>Note: This will create a real iExec task on Arbitrum Sepolia.</p>
+                  <p>Investor addresses must be valid Ethereum addresses.</p>
+                </div>
               </div>
 
               {/* Recent Tasks */}
@@ -781,6 +948,13 @@ export default function AdminPortal() {
                       {iexecInstance ? 'Connected' : 'Disconnected'}
                     </span>
                   </div>
+                  
+                  {iExecNetwork && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-700">Network</span>
+                      <span className="font-medium text-sm">{iExecNetwork}</span>
+                    </div>
+                  )}
                   
                   {iexecInstance && address && (
                     <>

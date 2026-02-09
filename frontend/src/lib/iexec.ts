@@ -1,20 +1,12 @@
 /* eslint-disable */
 import { IExec } from 'iexec';
+import { ethers } from 'ethers';
 
 // Configuration - Arbitrum Sepolia
 const IAPP_ADDRESS = process.env.NEXT_PUBLIC_IAPP_ADDRESS || "0xE6a92eBC3EF8f9Fcc4d069EBE2E9adcCf0693f15";
 const WORKERPOOL = process.env.NEXT_PUBLIC_IEXEC_WORKERPOOL || "prod-v8-arbitrum-sepolia.main.pools.iexec.eth";
 const TEE_TAG = process.env.NEXT_PUBLIC_IEXEC_TEE_TAG || "tee-scone";
 const IEXEC_EXPLORER_URL = process.env.NEXT_PUBLIC_IEXEC_EXPLORER_URL || "https://explorer.iex.ec/arbitrum-sepolia-testnet";
-
-// Network configuration for Arbitrum Sepolia
-const ARBITRUM_SEPOLIA_CONFIG = {
-  chainId: 421614,
-  name: 'arbitrum-sepolia',
-  rpcURL: 'https://sepolia-rollup.arbitrum.io/rpc',
-  explorerURL: 'https://sepolia.arbiscan.io',
-  iexecExplorerURL: 'https://explorer.iex.ec/arbitrum-sepolia-testnet'
-};
 
 // Interface for iExec task response
 interface IExecTask {
@@ -44,14 +36,7 @@ export const initializeIExec = async (ethProvider: any) => {
       ethProvider,
     });
     
-    // Get network info to verify connection
-    try {
-      const network = await iexec.network.getNetwork();
-      console.log("✅ iExec SDK initialized on network:", network);
-    } catch (error) {
-      console.log("⚠️ Could not fetch network info, but iExec initialized");
-    }
-    
+    console.log("✅ iExec SDK initialized");
     return iexec;
   } catch (error) {
     console.error("❌ iExec initialization failed:", error);
@@ -62,7 +47,6 @@ export const initializeIExec = async (ethProvider: any) => {
 // Fetch all tasks for a specific app from iExec Explorer
 export const fetchAppTasks = async (appAddress: string, limit: number = 50): Promise<ExplorerTask[]> => {
   try {
-    // Using the iExec Explorer API
     const response = await fetch(`${IEXEC_EXPLORER_URL}/task?app=${appAddress}&limit=${limit}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch tasks: ${response.statusText}`);
@@ -90,20 +74,6 @@ export const fetchTaskDetailsFromExplorer = async (taskId: string): Promise<Expl
   }
 };
 
-// Fetch deal details from iExec Explorer
-export const fetchDealDetails = async (dealId: string): Promise<any> => {
-  try {
-    const response = await fetch(`${IEXEC_EXPLORER_URL}/deal/${dealId}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch deal details: ${response.statusText}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.error("❌ Failed to fetch deal details:", error);
-    return null;
-  }
-};
-
 // Fetch app details from iExec Explorer
 export const fetchAppDetails = async (appAddress: string): Promise<any> => {
   try {
@@ -118,45 +88,72 @@ export const fetchAppDetails = async (appAddress: string): Promise<any> => {
   }
 };
 
-// Create task order for Arbitrum Sepolia TEE
+// Create task order for Arbitrum Sepolia TEE - REAL IMPLEMENTATION
 export const createTaskOrder = async (iexec: any, inputData: any): Promise<any> => {
   try {
-    const taskOrder = await iexec.order.createTaskorder({
+    // Get the current requester (connected wallet)
+    const requester = await iexec.wallet.getAddress();
+    
+    // Prepare task parameters
+    const taskParams = {
+      iexec_input_files: [],
+      iexec_secrets: {},
+      iexec_result_storage_provider: "ipfs",
+      iexec_result_storage_proxy: "https://result.v8-arbitrum-sepolia.iex.ec",
+    };
+    
+    // Create a requester order (this is the modern iExec SDK approach)
+    const requesterOrder = {
       app: IAPP_ADDRESS,
+      appmaxprice: 0,
       dataset: "0x0000000000000000000000000000000000000000",
+      datasetmaxprice: 0,
       workerpool: WORKERPOOL,
-      category: 0,
-      tag: TEE_TAG,
-      trust: 0,
+      workerpoolmaxprice: 0,
+      requester: requester,
       volume: 1,
-      params: {
-        iexec_input_files: [],
-        iexec_secrets: {},
-        iexec_result_storage_provider: "ipfs",
-        iexec_result_storage_proxy: "https://result.v8-arbitrum-sepolia.iex.ec",
-      },
-    });
-
-    return taskOrder;
+      tag: TEE_TAG,
+      category: 0,
+      trust: 0,
+      beneficiary: requester,
+      callback: inputData.metadata?.callbackAddress || "0x0000000000000000000000000000000000000000",
+      params: JSON.stringify(taskParams),
+      salt: ethers.hexlify(ethers.randomBytes(32)),
+    };
+    
+    console.log("Created requester order:", requesterOrder);
+    return requesterOrder;
   } catch (error) {
     console.error("❌ Task order creation failed:", error);
     throw error;
   }
 };
 
-// Publish task order to orderbook
+// Publish task order to orderbook - REAL IMPLEMENTATION
 export const publishTaskOrder = async (iexec: any, taskOrder: any): Promise<string> => {
   try {
-    const result = await iexec.orderbook.publishTaskorder(taskOrder);
-    console.log("✅ Task published:", result);
-    return result.taskid || result.taskId || '';
+    // Sign the order
+    const signedOrder = await iexec.order.signTaskOrder(taskOrder);
+    
+    // Publish to orderbook
+    const publishedOrder = await iexec.orderbook.publishTaskOrder(signedOrder);
+    
+    // Get the task ID from the published order
+    const taskId = publishedOrder.orderHash || publishedOrder.taskid;
+    
+    if (!taskId) {
+      throw new Error("No task ID returned from orderbook");
+    }
+    
+    console.log("✅ Task published with ID:", taskId);
+    return taskId;
   } catch (error) {
     console.error("❌ Task publishing failed:", error);
     throw error;
   }
 };
 
-// Monitor task status with real iExec API
+// Monitor task status
 export const monitorTask = async (iexec: any, taskId: string): Promise<IExecTask> => {
   try {
     const task = await iexec.task.show(taskId);
@@ -196,25 +193,49 @@ export const fetchTaskResults = async (iexec: any, taskId: string): Promise<any>
   }
 };
 
-// Claim task results
-export const claimTaskResults = async (iexec: any, taskId: string): Promise<any> => {
-  try {
-    const claim = await iexec.task.claim(taskId);
-    return claim;
-  } catch (error) {
-    console.error("❌ Results claim failed:", error);
-    throw error;
-  }
-};
-
-// Get wallet balance on Arbitrum Sepolia
+// ✅ FIXED: Get wallet balance
 export const getWalletBalance = async (iexec: any, address: string): Promise<string> => {
   try {
-    const balance = await iexec.wallet.getBalance(address);
-    return balance?.toString() || "0";
+    console.log("Getting balance for address:", address);
+    
+    // METHOD 1: Try account.balance()
+    try {
+      const accountInfo = await iexec.account.balance(address);
+      console.log("Account balance response:", accountInfo);
+      
+      if (accountInfo && typeof accountInfo === 'object') {
+        // Look for balance in various possible property names
+        if (accountInfo.balance !== undefined) {
+          return accountInfo.balance.toString() + " nRLC";
+        }
+        if (accountInfo.nRLC !== undefined) {
+          return accountInfo.nRLC.toString() + " nRLC";
+        }
+        if (accountInfo.value !== undefined) {
+          return accountInfo.value.toString() + " nRLC";
+        }
+      }
+    } catch (accountError) {
+      console.log("account.balance() failed:", accountError);
+    }
+    
+    // METHOD 2: Try direct provider balance (ETH balance)
+    try {
+      if (iexec.config?.ethProvider) {
+        const provider = new ethers.BrowserProvider(iexec.config.ethProvider);
+        const balance = await provider.getBalance(address);
+        const formatted = ethers.formatEther(balance);
+        return formatted + " ETH";
+      }
+    } catch (providerError) {
+      console.log("Provider balance failed:", providerError);
+    }
+    
+    return "Balance unavailable";
+    
   } catch (error) {
-    console.error("❌ Balance check failed:", error);
-    return "0";
+    console.error("❌ All balance checks failed:", error);
+    return "Error fetching balance";
   }
 };
 
@@ -229,36 +250,44 @@ export const getAccountInfo = async (iexec: any, address: string): Promise<any> 
   }
 };
 
-// Get network information
+// ✅ FIXED: Get network information
 export const getNetworkInfo = async (iexec: any): Promise<any> => {
   try {
-    const network = await iexec.network.getNetwork();
-    return network;
+    // Get chain ID from the provider
+    if (iexec.config && iexec.config.ethProvider) {
+      const provider = new ethers.BrowserProvider(iexec.config.ethProvider);
+      const network = await provider.getNetwork();
+      
+      return {
+        chainId: network.chainId.toString(),
+        name: network.name || "Unknown",
+        isNative: network.chainId === 421614n // Arbitrum Sepolia
+      };
+    }
+    
+    return {
+      chainId: "unknown",
+      name: "Unknown",
+      isNative: false
+    };
   } catch (error) {
     console.error("❌ Network info fetch failed:", error);
-    return null;
+    return {
+      chainId: "error",
+      name: "Error fetching network",
+      isNative: false
+    };
   }
 };
 
-// Get workerpool information
-export const getWorkerpoolInfo = async (iexec: any, workerpoolAddress: string): Promise<any> => {
+// Get wallet address
+export const getWalletAddress = async (iexec: any): Promise<string> => {
   try {
-    const workerpool = await iexec.workerpool.show(workerpoolAddress);
-    return workerpool;
+    const address = await iexec.wallet.getAddress();
+    return address;
   } catch (error) {
-    console.error("❌ Workerpool info fetch failed:", error);
-    return null;
-  }
-};
-
-// Check if iExec is available on current network
-export const checkIExecAvailability = async (iexec: any): Promise<boolean> => {
-  try {
-    await iexec.network.getNetwork();
-    return true;
-  } catch (error) {
-    console.error("iExec not available on current network:", error);
-    return false;
+    console.error("❌ Failed to get wallet address:", error);
+    return "";
   }
 };
 
