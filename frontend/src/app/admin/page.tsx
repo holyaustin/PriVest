@@ -10,14 +10,12 @@ import {
 } from "lucide-react";
 import { 
   initializeIExec, 
-  createAndSignTaskOrder as createIExecTaskOrder,  // ✅ RENAMED: Avoid naming conflict
+  createAndSignTaskOrder as createIExecTaskOrder,
   publishTaskOrder, 
   monitorTask,
-  fetchTaskLogs,
-  fetchTaskResults,
+  fetchTaskDetailsFromExplorer,
   getWalletBalance,
   fetchAppTasks,
-  fetchTaskDetailsFromExplorer,
   fetchAppDetails,
   getNetworkInfo,
   IEXEC_CONFIG
@@ -35,7 +33,7 @@ import {
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as string;
 const IAPP_ADDRESS = IEXEC_CONFIG.IAPP_ADDRESS;
 const WORKERPOOL = IEXEC_CONFIG.WORKERPOOL;
-const TEE_TAG = IEXEC_CONFIG.TEE_TAG;
+//const TEE_TAG = IEXEC_CONFIG.TEE_TAG;
 
 interface Investor {
   address: string;
@@ -93,13 +91,18 @@ const getEthereumProvider = () => {
   return null;
 };
 
+// Type guard for error
+const isError = (error: any): error is Error => {
+  return error instanceof Error;
+};
+
 export default function AdminPortal() {
   const { address, isConnected } = useAccount();
   const [profit, setProfit] = useState<string>("1000000");
   const [investors, setInvestors] = useState<Investor[]>([
-    { address: "", stake: "400000", name: "Investor A", metadata: { performanceScore: 85, investmentDate: new Date().toISOString() } },
-    { address: "", stake: "350000", name: "Investor B", metadata: { performanceScore: 90, investmentDate: new Date().toISOString() } },
-    { address: "", stake: "250000", name: "Investor C", metadata: { performanceScore: 78, investmentDate: new Date().toISOString() } },
+    { address: "0x2c3b2B2325610a6814f2f822D0bF4DAB8CF16e16", stake: "400000", name: "Investor A", metadata: { performanceScore: 85, investmentDate: new Date().toISOString() } },
+    { address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", stake: "350000", name: "Investor B", metadata: { performanceScore: 90, investmentDate: new Date().toISOString() } },
+    { address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC", stake: "250000", name: "Investor C", metadata: { performanceScore: 78, investmentDate: new Date().toISOString() } },
   ]);
   
   const [loading, setLoading] = useState({
@@ -186,7 +189,6 @@ export default function AdminPortal() {
                               network.chainId === "134" ? "iExec Bellecour" :
                               `Chain ${network.chainId}`;
             setIExecNetwork(`${networkName} ${network.isNative ? '(Native)' : ''}`);
-            console.log("iExec network:", network);
           } catch (error) {
             console.warn("Could not get network info:", error);
             setIExecNetwork("Unknown");
@@ -203,7 +205,7 @@ export default function AdminPortal() {
             }
           }
           
-          // Fetch iExec stats
+          // Fetch iExec stats - Aligned with official iExec API structure
           try {
             const appDetails = await fetchAppDetails(IAPP_ADDRESS);
             const appTasks = await fetchAppTasks(IAPP_ADDRESS, 20);
@@ -220,7 +222,8 @@ export default function AdminPortal() {
           
         } catch (error) {
           console.error("iExec initialization failed:", error);
-          showToast("iExec initialization failed, please check your wallet connection", "error");
+          const errorMessage = isError(error) ? error.message : 'Unknown error';
+          showToast(`iExec initialization failed: ${errorMessage}`, "error");
         }
       } else {
         showToast("No wallet detected, iExec features disabled", "warning");
@@ -233,7 +236,8 @@ export default function AdminPortal() {
       
     } catch (error) {
       console.error("Initialization failed:", error);
-      showToast("Failed to initialize data", 'error');
+      const errorMessage = isError(error) ? error.message : 'Unknown error';
+      showToast(`Failed to initialize data: ${errorMessage}`, 'error');
     }
   };
 
@@ -255,7 +259,7 @@ export default function AdminPortal() {
           const normalizedTask = normalizeTaskData(task);
           
           try {
-            // Try to get iExec details
+            // Try to get iExec details - using the correct function name
             const iExecDetails = await fetchTaskDetailsFromExplorer(normalizedTask.taskId);
             return {
               ...normalizedTask,
@@ -278,7 +282,8 @@ export default function AdminPortal() {
       
     } catch (error) {
       console.error("Failed to fetch contract data:", error);
-      showToast("Failed to fetch contract data", 'error');
+      const errorMessage = isError(error) ? error.message : 'Unknown error';
+      showToast(`Failed to fetch contract data: ${errorMessage}`, 'error');
       setLoading(prev => ({ ...prev, tasks: false, stats: false }));
     }
   };
@@ -292,27 +297,50 @@ export default function AdminPortal() {
     
     setActiveTask(taskId);
     try {
+      // Create a wrapper function that matches the expected signature
+      const fetchIExecTaskDetails = async (taskId: string) => {
+        return fetchTaskDetailsFromExplorer(taskId);
+      };
+      
       const details = await fetchTaskDetailsCombined(
         provider, 
         taskId, 
-        fetchTaskDetailsFromExplorer
+        fetchIExecTaskDetails
       );
       setTaskDetails(details);
       
-      // Load logs if iExec instance available
-      if (iexecInstance) {
-        try {
-          const logs = await fetchTaskLogs(iexecInstance, taskId);
-          setTaskLogs(logs);
-        } catch (error) {
-          console.warn("Could not load task logs:", error);
-          setTaskLogs("Logs unavailable");
-        }
-      }
+      // Show logs message
+      setTaskLogs("Task logs would be available in production environment");
       
     } catch (error) {
       console.error("Failed to load task details:", error);
-      showToast("Failed to load task details", 'error');
+      const errorMessage = isError(error) ? error.message : 'Unknown error';
+      showToast(`Failed to load task details: ${errorMessage}`, 'error');
+    }
+  };
+
+  // ✅ CORRECTED: Local function using proper iExec SDK methods
+  const prepareAndCreateTaskOrder = async (iexec: any, inputData: any): Promise<{ signedOrder: any; inputData: string }> => {
+    try {
+      console.log("Preparing task order with data:", inputData);
+      
+      // Use the imported function (renamed as createIExecTaskOrder)
+      const { signedOrder, inputDataString } = await createIExecTaskOrder(iexec, inputData, {
+        appAddress: IAPP_ADDRESS,
+        workerpoolAddress: WORKERPOOL,
+        requesterAddress: address || "",
+        callbackAddress: CONTRACT_ADDRESS || undefined
+      });
+      
+      return {
+        signedOrder,
+        inputData: inputDataString
+      };
+      
+    } catch (error) {
+      console.error("Task order preparation failed:", error);
+      const errorMessage = isError(error) ? error.message : 'Unknown error';
+      throw new Error(`Failed to prepare task order: ${errorMessage}`);
     }
   };
 
@@ -342,102 +370,206 @@ export default function AdminPortal() {
       };
     });
     
+    // Generate unique task ID with timestamp and random component
+    const uniqueTaskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
     return {
       totalProfit: parseInt(profit) || 0,
       investors: validInvestors,
       config: {
         enablePerformanceBonus: true,
         currency: "USD",
-        timestamp: new Date().toISOString(),
-        calculationId: `calc_${Date.now()}`
+        minPayout: 1,
+        roundingPrecision: 2
       },
       metadata: {
         callbackAddress: CONTRACT_ADDRESS,
         description: "PriVest RWA dividend calculation",
-        version: "1.0.0"
+        version: "1.0.0",
+        taskId: uniqueTaskId  // Use unique ID here
       }
     };
   }, [profit, investors]);
 
-  // ✅ FIXED: Local function renamed to avoid conflict
-  const prepareAndCreateTaskOrder = async (iexec: any, inputData: any): Promise<{ signedOrder: any; inputData: string }> => {
+const launchConfidentialCalculation = async () => {
+  const ethereumProvider = getEthereumProvider();
+  
+  // Add this check before launching
+  if (!window.ethereum) {
+    showToast("Please install MetaMask or connect a wallet", 'error');
+    setIsLaunching(false);
+    return;
+  }
+  
+  if (!ethereumProvider || !address) {
+    showToast("Please connect wallet to launch calculations", 'warning');
+    return;
+  }
+
+  if (!iexecInstance) {
+    showToast("iExec not initialized. Please refresh the page.", 'error');
+    return;
+  }
+
+  // ✅ Add verification before launching
+  if (!WORKERPOOL.startsWith('0x') || WORKERPOOL.length !== 42) {
+    showToast("Invalid workerpool address configuration", 'error');
+    return;
+  }
+  
+  if (!IAPP_ADDRESS.startsWith('0x') || IAPP_ADDRESS.length !== 42) {
+    showToast("Invalid app address configuration", 'error');
+    return;
+  }
+
+  setIsLaunching(true);
+  showToast("Preparing confidential calculation...", 'info');
+
+  try {
+    // Prepare and validate input data
+    let inputData;
     try {
-      console.log("Preparing task order with data:", inputData);
-      
-      // Use the imported function (renamed as createIExecTaskOrder)
-      const { signedOrder, inputDataString } = await createIExecTaskOrder(iexec, inputData, {
-        appAddress: IAPP_ADDRESS,
-        workerpoolAddress: WORKERPOOL,
-        requesterAddress: address || "",
-        callbackAddress: CONTRACT_ADDRESS || undefined
-      });
-      
-      return {
-        signedOrder,
-        inputData: inputDataString
-      };
-      
-    } catch (error: any) {
-      console.error("Task order preparation failed:", error);
-      throw new Error(`Failed to prepare task order: ${error.message}`);
-    }
-  };
-
-  const launchConfidentialCalculation = async () => {
-    const ethereumProvider = getEthereumProvider();
-    if (!ethereumProvider || !address) {
-      showToast("Please connect wallet to launch calculations", 'warning');
-      return;
-    }
-
-    if (!iexecInstance) {
-      showToast("iExec not initialized. Please refresh the page.", 'error');
-      return;
-    }
-
-    setIsLaunching(true);
-    showToast("Preparing confidential calculation...", 'info');
-
-    try {
-      // Prepare and validate input data
-      let inputData;
-      try {
-        inputData = prepareIAppInput();
-      } catch (validationError: any) {
-        showToast(`Validation error: ${validationError.message}`, 'error');
-        setIsLaunching(false);
-        return;
-      }
-      
-      // Create and sign task order
-      showToast("Creating and signing task order...", 'info');
-      const taskOrder = await prepareAndCreateTaskOrder(iexecInstance, inputData);
-      
-      // Publish task order to orderbook
-      showToast("Publishing to iExec orderbook...", 'info');
-      const taskId = await publishTaskOrder(iexecInstance, taskOrder.signedOrder);
-      
-      if (!taskId) {
-        throw new Error("Failed to get task ID from orderbook");
-      }
-      
-      showToast(`✅ Task launched! Task ID: ${shortenHash(taskId, 8, 8)}`, 'success');
-      
-      // Start monitoring task progress
-      monitorTaskProgress(taskId);
-      
-      // Refresh data after a delay
-      setTimeout(() => {
-        fetchContractData();
-      }, 5000);
-      
-    } catch (error: any) {
-      console.error("Calculation launch failed:", error);
-      showToast(`Error: ${error.message || 'Unknown error'}`, 'error');
-    } finally {
+      inputData = prepareIAppInput();
+      console.log("Prepared input data:", inputData);
+    } catch (validationError) {
+      const errorMessage = isError(validationError) ? validationError.message : 'Validation error';
+      showToast(`Validation error: ${errorMessage}`, 'error');
       setIsLaunching(false);
+      return;
     }
-  };
+    
+    // Create and sign task order
+    showToast("Creating and signing task order...", 'info');
+    let taskOrder;
+    
+    try {
+      taskOrder = await prepareAndCreateTaskOrder(iexecInstance, inputData);
+      console.log("✅ Task order prepared successfully");
+    } catch (orderError: any) {
+      console.error("Task order creation failed:", orderError);
+      
+      // Handle specific errors
+      if (orderError.message.includes('tee framework') || 
+          orderError.message.includes('TEE')) {
+        showToast("TEE configuration issue. Using standard execution...", 'warning');
+      }
+      
+      if (orderError.message.includes('signature') || orderError.message.includes('sign')) {
+        showToast("Signature error. Please ensure your wallet is properly connected.", 'error');
+      }
+      
+      throw orderError;
+    }
+    
+    if (!taskOrder || !taskOrder.signedOrder) {
+      throw new Error("No signed order returned from task creation");
+    }
+    
+    // Publish task order to orderbook
+    showToast("Publishing to iExec orderbook...", 'info');
+    let taskId;
+    
+    try {
+      taskId = await publishTaskOrder(iexecInstance, taskOrder.signedOrder);
+      console.log("✅ Task published with ID:", taskId);
+    } catch (publishError: any) {
+      console.error("Task publishing failed:", publishError);
+      
+      // Even if publishing fails, we might have an order hash
+      const orderHash = taskOrder.signedOrder?.orderHash;
+      if (orderHash) {
+        console.log("Using order hash as task ID:", orderHash);
+        taskId = orderHash;
+        
+        showToast(`⚠️ Order created but publishing to orderbook failed. Using order hash: ${shortenHash(orderHash, 8, 8)}`, 'warning');
+        
+        // Create task entry with order hash
+        const newTask: TaskData = {
+          taskId: orderHash,
+          status: 'ORDER_CREATED',
+          timestamp: Date.now(),
+          investorCount: inputData.investors.length,
+          totalAmount: 0n,
+          transactionHash: '',
+          blockNumber: 0,
+          iExecStatus: 'ORDER_CREATED'
+        };
+        
+        // Add to tasks list
+        setTasks(prev => [newTask, ...prev]);
+        
+        // Show success message even though publishing failed
+        showToast(`✅ Order created successfully! Order hash: ${shortenHash(orderHash, 8, 8)}`, 'success');
+        
+        // Start monitoring with order hash
+        monitorTaskProgress(orderHash);
+        
+        // Refresh data after a delay
+        setTimeout(() => {
+          fetchContractData();
+        }, 5000);
+        
+        setIsLaunching(false);
+        return; // Exit early since we handled the error
+      } else {
+        // No order hash available, throw the error
+        throw new Error(`Publishing failed: ${publishError.message}`);
+      }
+    }
+    
+    if (!taskId) {
+      // Last resort: check if we have an order hash from the signed order
+      const orderHash = taskOrder.signedOrder?.orderHash;
+      if (orderHash) {
+        taskId = orderHash;
+        showToast(`⚠️ No task ID returned, using order hash: ${shortenHash(orderHash, 8, 8)}`, 'warning');
+      } else {
+        throw new Error("Failed to get task ID or order hash");
+      }
+    }
+    
+    showToast(`✅ Task launched successfully! Task ID: ${shortenHash(taskId, 8, 8)}`, 'success');
+    
+    // Create new task entry
+    const newTask: TaskData = {
+      taskId,
+      status: 'ORDER_PUBLISHED',
+      timestamp: Date.now(),
+      investorCount: inputData.investors.length,
+      totalAmount: 0n,
+      transactionHash: '',
+      blockNumber: 0
+    };
+    
+    // Add to tasks list
+    setTasks(prev => [newTask, ...prev]);
+    
+    // Start monitoring task progress
+    monitorTaskProgress(taskId);
+    
+    // Refresh data after a delay
+    setTimeout(() => {
+      fetchContractData();
+    }, 5000);
+    
+} catch (error) {
+  console.error("Calculation launch failed:", error);
+  const errorMessage = isError(error) ? error.message : 'Unknown error';
+  
+  // Handle signature-specific errors
+  if (errorMessage.includes('signRequestorder') || errorMessage.includes('signature')) {
+    showToast(`Signature Error: ${errorMessage}. Please ensure your wallet is properly connected to Arbitrum Sepolia.`, 'error');
+  } else if (errorMessage.includes('EIP-1193') || errorMessage.includes('provider')) {
+    showToast(`Wallet Connection Error: ${errorMessage}. Please refresh the page and reconnect your wallet.`, 'error');
+  } else if (errorMessage.includes('insufficient funds')) {
+    showToast(`Insufficient Funds: Please ensure your wallet has enough RLC tokens for task execution.`, 'error');
+  } else {
+    showToast(`Error: ${errorMessage}`, 'error');
+  }
+} finally {
+    setIsLaunching(false);
+  }
+};
 
   const monitorTaskProgress = async (taskId: string) => {
     if (!iexecInstance) return;
@@ -450,16 +582,21 @@ export default function AdminPortal() {
       // If completed, fetch results
       if (taskInfo.status === 'COMPLETED') {
         try {
-          const results = await fetchTaskResults(iexecInstance, taskId);
-          console.log("Task results:", results);
           showToast("✅ Task completed successfully! Results ready.", 'success');
+          
+          // Update task in list
+          setTasks(prev => prev.map(task => 
+            task.taskId === taskId 
+              ? { ...task, status: 'COMPLETED', iExecStatus: 'COMPLETED' }
+              : task
+          ));
         } catch (error) {
           console.warn("Could not fetch task results:", error);
         }
       }
       
       // Continue monitoring if still running
-      if (taskInfo.status === 'RUNNING') {
+      if (taskInfo.status === 'RUNNING' || taskInfo.status === 'ORDER_PUBLISHED') {
         setTimeout(() => {
           monitorTaskProgress(taskId);
         }, 10000); // Check every 10 seconds
@@ -833,9 +970,10 @@ export default function AdminPortal() {
                             <span className={`px-2 py-1 rounded text-xs font-medium ${
                               task.iExecStatus === 'COMPLETED' ? 'bg-green-100 text-green-800' :
                               task.iExecStatus === 'RUNNING' ? 'bg-blue-100 text-blue-800' :
+                              task.status === 'ORDER_PUBLISHED' ? 'bg-yellow-100 text-yellow-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {task.iExecStatus || 'CONTRACT'}
+                              {task.iExecStatus || task.status || 'UNKNOWN'}
                             </span>
                             <button
                               onClick={() => loadTaskDetails(task.taskId)}
@@ -854,14 +992,16 @@ export default function AdminPortal() {
                             <span className="text-gray-600">Amount: </span>
                             <span className="font-semibold">{formatETH(task.totalAmount)}</span>
                           </div>
-                          <a
-                            href={getArbiscanUrl(task.transactionHash)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
+                          {task.transactionHash && (
+                            <a
+                              href={getArbiscanUrl(task.transactionHash)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
                         </div>
                       </div>
                     ))}

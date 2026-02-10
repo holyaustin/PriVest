@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3014",
+    "dev": "next dev",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "build": "next build"
