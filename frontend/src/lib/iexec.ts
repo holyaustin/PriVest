@@ -37,6 +37,14 @@ export const initializeIExec = async (ethProvider: any) => {
     });
     
     console.log("✅ iExec SDK initialized");
+    
+    // Log available methods for debugging
+    console.log("iExec SDK methods:", {
+      order: Object.keys(iexec.order || {}),
+      orderbook: Object.keys(iexec.orderbook || {}),
+      task: Object.keys(iexec.task || {})
+    });
+    
     return iexec;
   } catch (error) {
     console.error("❌ iExec initialization failed:", error);
@@ -88,11 +96,15 @@ export const fetchAppDetails = async (appAddress: string): Promise<any> => {
   }
 };
 
-// Create task order for Arbitrum Sepolia TEE - REAL IMPLEMENTATION
-export const createTaskOrder = async (iexec: any, inputData: any): Promise<any> => {
+// ✅ CORRECTED: Create and sign task order based on iExec SDK sandbox examples
+export const createAndSignTaskOrder = async (iexec: any, inputData: any, options: {
+  appAddress: string;
+  workerpoolAddress: string;
+  requesterAddress: string;
+  callbackAddress?: string;
+}): Promise<{ signedOrder: any; inputDataString: string }> => {
   try {
-    // Get the current requester (connected wallet)
-    const requester = await iexec.wallet.getAddress();
+    console.log("Creating task order for app:", options.appAddress);
     
     // Prepare task parameters
     const taskParams = {
@@ -100,48 +112,60 @@ export const createTaskOrder = async (iexec: any, inputData: any): Promise<any> 
       iexec_secrets: {},
       iexec_result_storage_provider: "ipfs",
       iexec_result_storage_proxy: "https://result.v8-arbitrum-sepolia.iex.ec",
+      // Encode input data for TEE app
+      cmdline: `--data ${Buffer.from(JSON.stringify(inputData)).toString('base64')}`,
     };
     
-    // Create a requester order (this is the modern iExec SDK approach)
-    const requesterOrder = {
-      app: IAPP_ADDRESS,
-      appmaxprice: 0,
+    // ✅ CORRECT: Create a task order object (NOT createRequesterOrder)
+    const taskOrder = {
+      app: options.appAddress,
+      appmaxprice: "0", // Price in nRLC
       dataset: "0x0000000000000000000000000000000000000000",
-      datasetmaxprice: 0,
-      workerpool: WORKERPOOL,
-      workerpoolmaxprice: 0,
-      requester: requester,
+      datasetmaxprice: "0",
+      workerpool: options.workerpoolAddress,
+      workerpoolmaxprice: "0",
+      requester: options.requesterAddress,
       volume: 1,
       tag: TEE_TAG,
       category: 0,
       trust: 0,
-      beneficiary: requester,
-      callback: inputData.metadata?.callbackAddress || "0x0000000000000000000000000000000000000000",
+      beneficiary: options.requesterAddress,
+      callback: options.callbackAddress || "0x0000000000000000000000000000000000000000",
       params: JSON.stringify(taskParams),
       salt: ethers.hexlify(ethers.randomBytes(32)),
     };
     
-    console.log("Created requester order:", requesterOrder);
-    return requesterOrder;
+    console.log("Created task order object:", taskOrder);
+    
+    // ✅ CORRECT: Sign the task order
+    // Based on iExec SDK examples, use signTaskOrder
+    const signedOrder = await iexec.order.signTaskOrder(taskOrder);
+    console.log("✅ Task order signed successfully");
+    
+    return {
+      signedOrder,
+      inputDataString: JSON.stringify(inputData)
+    };
+    
   } catch (error) {
     console.error("❌ Task order creation failed:", error);
     throw error;
   }
 };
 
-// Publish task order to orderbook - REAL IMPLEMENTATION
-export const publishTaskOrder = async (iexec: any, taskOrder: any): Promise<string> => {
+// ✅ CORRECTED: Publish task order to orderbook
+export const publishTaskOrder = async (iexec: any, signedOrder: any): Promise<string> => {
   try {
-    // Sign the order
-    const signedOrder = await iexec.order.signTaskOrder(taskOrder);
+    console.log("Publishing task order to orderbook...");
     
-    // Publish to orderbook
+    // ✅ CORRECT: Publish to orderbook using publishTaskOrder
     const publishedOrder = await iexec.orderbook.publishTaskOrder(signedOrder);
     
     // Get the task ID from the published order
     const taskId = publishedOrder.orderHash || publishedOrder.taskid;
     
     if (!taskId) {
+      console.error("Published order response:", publishedOrder);
       throw new Error("No task ID returned from orderbook");
     }
     
@@ -193,18 +217,17 @@ export const fetchTaskResults = async (iexec: any, taskId: string): Promise<any>
   }
 };
 
-// ✅ FIXED: Get wallet balance
+// Get wallet balance
 export const getWalletBalance = async (iexec: any, address: string): Promise<string> => {
   try {
     console.log("Getting balance for address:", address);
     
-    // METHOD 1: Try account.balance()
+    // Try account.balance()
     try {
       const accountInfo = await iexec.account.balance(address);
       console.log("Account balance response:", accountInfo);
       
       if (accountInfo && typeof accountInfo === 'object') {
-        // Look for balance in various possible property names
         if (accountInfo.balance !== undefined) {
           return accountInfo.balance.toString() + " nRLC";
         }
@@ -219,7 +242,7 @@ export const getWalletBalance = async (iexec: any, address: string): Promise<str
       console.log("account.balance() failed:", accountError);
     }
     
-    // METHOD 2: Try direct provider balance (ETH balance)
+    // Try direct provider balance (ETH balance)
     try {
       if (iexec.config?.ethProvider) {
         const provider = new ethers.BrowserProvider(iexec.config.ethProvider);
@@ -250,10 +273,9 @@ export const getAccountInfo = async (iexec: any, address: string): Promise<any> 
   }
 };
 
-// ✅ FIXED: Get network information
+// Get network information
 export const getNetworkInfo = async (iexec: any): Promise<any> => {
   try {
-    // Get chain ID from the provider
     if (iexec.config && iexec.config.ethProvider) {
       const provider = new ethers.BrowserProvider(iexec.config.ethProvider);
       const network = await provider.getNetwork();
@@ -299,4 +321,12 @@ export const getIExecExplorerTaskUrl = (taskId: string): string => {
 // Get iExec explorer URL for an app
 export const getIExecExplorerAppUrl = (appAddress: string): string => {
   return `${IEXEC_EXPLORER_URL}/app/${appAddress}`;
+};
+
+// Export constants for use in other files
+export const IEXEC_CONFIG = {
+  IAPP_ADDRESS,
+  WORKERPOOL,
+  TEE_TAG,
+  IEXEC_EXPLORER_URL
 };

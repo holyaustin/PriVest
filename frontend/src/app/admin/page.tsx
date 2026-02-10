@@ -1,5 +1,3 @@
-/* eslint-disable */
-
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -12,7 +10,7 @@ import {
 } from "lucide-react";
 import { 
   initializeIExec, 
-  createTaskOrder, 
+  createAndSignTaskOrder as createIExecTaskOrder,  // ✅ RENAMED: Avoid naming conflict
   publishTaskOrder, 
   monitorTask,
   fetchTaskLogs,
@@ -21,7 +19,8 @@ import {
   fetchAppTasks,
   fetchTaskDetailsFromExplorer,
   fetchAppDetails,
-  getNetworkInfo
+  getNetworkInfo,
+  IEXEC_CONFIG
 } from "@/lib/iexec";
 import {
   fetchAllPayoutEvents,
@@ -32,9 +31,11 @@ import {
   shortenHash
 } from "@/lib/contract";
 
-// Configuration
+// Configuration - Use imported config or fallback
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as string;
-const IAPP_ADDRESS = process.env.NEXT_PUBLIC_IAPP_ADDRESS as string;
+const IAPP_ADDRESS = IEXEC_CONFIG.IAPP_ADDRESS;
+const WORKERPOOL = IEXEC_CONFIG.WORKERPOOL;
+const TEE_TAG = IEXEC_CONFIG.TEE_TAG;
 
 interface Investor {
   address: string;
@@ -47,7 +48,6 @@ interface Investor {
   };
 }
 
-// Updated TaskData interface to match actual data structure
 interface TaskData {
   taskId: string;
   status: string;
@@ -82,12 +82,10 @@ interface ToastMessage {
 const getEthereumProvider = () => {
   if (typeof window === 'undefined') return null;
   
-  // Check for various wallet providers
   if (window.ethereum) {
     return window.ethereum;
   }
   
-  // Check for injected web3
   if ((window as any).web3?.currentProvider) {
     return (window as any).web3.currentProvider;
   }
@@ -181,10 +179,9 @@ export default function AdminPortal() {
           const iexec = await initializeIExec(ethereumProvider);
           setIexecInstance(iexec);
           
-          // Get network info - FIXED: Using correct iExec SDK API
+          // Get network info
           try {
             const network = await getNetworkInfo(iexec);
-            // network is { chainId: string; isNative: boolean; }
             const networkName = network.chainId === "421614" ? "Arbitrum Sepolia" : 
                               network.chainId === "134" ? "iExec Bellecour" :
                               `Chain ${network.chainId}`;
@@ -196,16 +193,15 @@ export default function AdminPortal() {
           }
           
           // Get wallet balance
-          // ✅ FIXED: Get wallet balance - SIMPLIFIED
-            if (address) {
-              try {
-                const balance = await getWalletBalance(iexec, address);
-                setWalletBalance(balance);
-              } catch (error) {
-                console.warn("Could not get wallet balance:", error);
-                setWalletBalance("Balance unavailable");
-              }
+          if (address) {
+            try {
+              const balance = await getWalletBalance(iexec, address);
+              setWalletBalance(balance);
+            } catch (error) {
+              console.warn("Could not get wallet balance:", error);
+              setWalletBalance("Balance unavailable");
             }
+          }
           
           // Fetch iExec stats
           try {
@@ -326,7 +322,6 @@ export default function AdminPortal() {
       let address = inv.address;
       
       // If no address provided, use a placeholder that will fail validation
-      // This ensures users must provide real addresses
       if (!address || address.trim() === "" || !address.startsWith("0x")) {
         throw new Error(`Investor ${idx + 1} must have a valid Ethereum address`);
       }
@@ -364,82 +359,27 @@ export default function AdminPortal() {
     };
   }, [profit, investors]);
 
-  // Updated createAndSignTaskOrder to match iExec SDK API
-  const createAndSignTaskOrder = async (iexec: any, inputData: any) => {
+  // ✅ FIXED: Local function renamed to avoid conflict
+  const prepareAndCreateTaskOrder = async (iexec: any, inputData: any): Promise<{ signedOrder: any; inputData: string }> => {
     try {
-      // Prepare task parameters according to iExec requirements
-      const taskParams = {
-        iexec_input_files: [],
-        iexec_secrets: {},
-        iexec_result_storage_provider: "ipfs",
-        iexec_result_storage_proxy: "https://result.v8-arbitrum-sepolia.iex.ec",
-      };
+      console.log("Preparing task order with data:", inputData);
       
-      // Encode the input data as JSON string for the TEE
-      const inputDataString = JSON.stringify(inputData);
-      console.log("Creating task order with data:", inputData);
-      
-      // Get the app order - Using correct iExec SDK API
-      const appOrder = await iexec.order.createAppOrder({
-        app: IAPP_ADDRESS,
-        appprice: "0", // Price in nRLC
-        volume: "1",
-        tag: "tee,scone",
-        datasetrestrict: "0x0000000000000000000000000000000000000000",
-        workerpoolrestrict: "0x0000000000000000000000000000000000000000",
-        requesterrestrict: "0x0000000000000000000000000000000000000000",
-        salt: ethers.hexlify(ethers.randomBytes(32)),
+      // Use the imported function (renamed as createIExecTaskOrder)
+      const { signedOrder, inputDataString } = await createIExecTaskOrder(iexec, inputData, {
+        appAddress: IAPP_ADDRESS,
+        workerpoolAddress: WORKERPOOL,
+        requesterAddress: address || "",
+        callbackAddress: CONTRACT_ADDRESS || undefined
       });
-      
-      // Sign the app order
-      const signedAppOrder = await iexec.order.signAppOrder(appOrder);
-      
-      // Get the workerpool order
-      const workerpoolOrder = await iexec.order.createWorkerpoolOrder({
-        workerpool: "prod-v8-arbitrum-sepolia.main.pools.iexec.eth",
-        workerpoolprice: "0",
-        volume: "1",
-        tag: "tee,scone",
-        category: "0",
-        trust: "0",
-        apprestrict: IAPP_ADDRESS,
-        datasetrestrict: "0x0000000000000000000000000000000000000000",
-        requesterrestrict: "0x0000000000000000000000000000000000000000",
-        salt: ethers.hexlify(ethers.randomBytes(32)),
-      });
-      
-      // Sign the workerpool order
-      const signedWorkerpoolOrder = await iexec.order.signWorkerpoolOrder(workerpoolOrder);
-      
-      // Create requester order
-      const requesterOrder = await iexec.order.createRequesterOrder({
-        app: IAPP_ADDRESS,
-        appmaxprice: "0",
-        workerpool: "prod-v8-arbitrum-sepolia.main.pools.iexec.eth",
-        workerpoolmaxprice: "0",
-        volume: "1",
-        tag: "tee,scone",
-        category: "0",
-        trust: "0",
-        beneficiary: address,
-        callback: CONTRACT_ADDRESS,
-        params: JSON.stringify(taskParams),
-        salt: ethers.hexlify(ethers.randomBytes(32)),
-      });
-      
-      // Sign the requester order
-      const signedRequesterOrder = await iexec.order.signRequesterOrder(requesterOrder);
       
       return {
-        appOrder: signedAppOrder,
-        workerpoolOrder: signedWorkerpoolOrder,
-        requesterOrder: signedRequesterOrder,
+        signedOrder,
         inputData: inputDataString
       };
       
     } catch (error: any) {
-      console.error("Task order creation failed:", error);
-      throw new Error(`Failed to create task order: ${error.message}`);
+      console.error("Task order preparation failed:", error);
+      throw new Error(`Failed to prepare task order: ${error.message}`);
     }
   };
 
@@ -471,11 +411,11 @@ export default function AdminPortal() {
       
       // Create and sign task order
       showToast("Creating and signing task order...", 'info');
-      const taskOrder = await createAndSignTaskOrder(iexecInstance, inputData);
+      const taskOrder = await prepareAndCreateTaskOrder(iexecInstance, inputData);
       
       // Publish task order to orderbook
       showToast("Publishing to iExec orderbook...", 'info');
-      const taskId = await publishTaskOrder(iexecInstance, taskOrder);
+      const taskId = await publishTaskOrder(iexecInstance, taskOrder.signedOrder);
       
       if (!taskId) {
         throw new Error("Failed to get task ID from orderbook");
@@ -960,7 +900,7 @@ export default function AdminPortal() {
                     <>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-700">Wallet Balance</span>
-                        <span className="font-mono text-sm">{walletBalance} nRLC</span>
+                        <span className="font-mono text-sm">{walletBalance}</span>
                       </div>
                       
                       <div className="pt-4 border-t border-gray-200">
