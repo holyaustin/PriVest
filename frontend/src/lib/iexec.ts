@@ -27,7 +27,7 @@ interface RequestOrder {
   category: number;
   trust: number;
   beneficiary: string;
-  callback: string;
+  callback: string; // ✅ This must always be a valid address
   params: string;
   salt: string;
 }
@@ -77,11 +77,12 @@ export const initializeIExec = async (ethProvider: Eip1193Provider) => {
   }
 };
 
-// Create and sign task order - CORRECTED based on iExec SDK examples
+// Create and sign task order - FIXED callback issue
 export const createAndSignTaskOrder = async (iexec: any, inputData: any, options: TaskOrderOptions): Promise<{ signedOrder: SignedOrder; inputDataString: string }> => {
   try {
     console.log("Creating task order for app:", options.appAddress);
     console.log("Using workerpool:", options.workerpoolAddress);
+    console.log("Using callback address:", options.callbackAddress || "No callback specified");
     
     // Encode input data
     const inputDataString = JSON.stringify(inputData);
@@ -90,14 +91,23 @@ export const createAndSignTaskOrder = async (iexec: any, inputData: any, options
     // Use zero tag for non-TEE execution
     const zeroTag = "0x0000000000000000000000000000000000000000000000000000000000000000";
     
-    // ✅ CORRECT: Based on iExec SDK examples from the sandbox
+    // ✅ FIX: Use valid params structure without cmdline
     const paramsObj = {
       iexec_input_files: [],
       iexec_result_storage_provider: "ipfs",
       iexec_result_storage_proxy: "https://result.v8.iex.ec",
-      // The app expects base64 data passed via cmdline
-      cmdline: `--data ${encodedData}`
+      // ✅ CORRECT: Pass data differently to avoid "Unknown key 'cmdline'" error
+      // The data should be in the params, not cmdline
+      data: encodedData
     };
+    
+    // ✅ FIX: Ensure callback is always a valid address
+    // If no callback is provided, use zero address
+    const callbackAddress = options.callbackAddress && options.callbackAddress.startsWith('0x') && options.callbackAddress.length === 42
+      ? options.callbackAddress
+      : "0x0000000000000000000000000000000000000000";
+    
+    console.log("Using callback address:", callbackAddress);
     
     const requestOrder: RequestOrder = {
       app: options.appAddress,
@@ -112,21 +122,19 @@ export const createAndSignTaskOrder = async (iexec: any, inputData: any, options
       category: 0,
       trust: 0,
       beneficiary: options.requesterAddress,
-      callback: options.callbackAddress || "0x0000000000000000000000000000000000000000",
+      callback: callbackAddress, // ✅ Always a valid address
       params: JSON.stringify(paramsObj),
       salt: ethers.hexlify(ethers.randomBytes(32))
     };
     
-    console.log("✅ Request order created");
+    console.log("✅ Request order created with callback:", callbackAddress);
     
-    // ✅ CORRECT: Based on iExec SDK examples, we should use signRequestorder
     let signedOrder: SignedOrder;
     
     try {
       console.log("Attempting to sign order with signRequestorder...");
       
       // Method 1: Use signRequestorder (as shown in iExec examples)
-      // The iExec SDK handles the signing internally
       const signedResult = await iexec.order.signRequestorder(requestOrder);
       console.log("✅ Order signed via signRequestorder");
       
@@ -188,7 +196,8 @@ export const createAndSignTaskOrder = async (iexec: any, inputData: any, options
       orderHash: !!signedOrder.orderHash,
       signature: !!signedOrder.signature,
       signatureLength: signedOrder.signature?.length,
-      signer: signedOrder.signer
+      signer: signedOrder.signer,
+      callback: signedOrder.order.callback // Log the callback being used
     });
     
     return {
@@ -202,29 +211,54 @@ export const createAndSignTaskOrder = async (iexec: any, inputData: any, options
   }
 };
 
-// Publish task order to orderbook - CORRECTED based on iExec examples
+// Publish task order to orderbook - FIXED with better error handling
+// Publish task order to orderbook - FIXED callback structure
 export const publishTaskOrder = async (iexec: any, signedOrder: SignedOrder): Promise<string> => {
   try {
     console.log("Publishing task order to orderbook...");
     
-    // ✅ CORRECT: Structure for publishing based on iExec SDK
+    // ✅ FIX: Debug the complete order structure
+    console.log("Complete signed order structure:", JSON.stringify({
+      order: {
+        ...signedOrder.order,
+        // Make sure all fields are present
+      },
+      orderHash: signedOrder.orderHash,
+      signature: signedOrder.signature,
+      signer: signedOrder.signer
+    }, null, 2));
+    
+    // ✅ FIX: Ensure the callback is properly formatted
+    // The iExec SDK is very strict about the callback field format
     const publishableOrder = {
-      order: signedOrder.order,
+      order: {
+        app: signedOrder.order.app,
+        appmaxprice: signedOrder.order.appmaxprice,
+        dataset: signedOrder.order.dataset,
+        datasetmaxprice: signedOrder.order.datasetmaxprice,
+        workerpool: signedOrder.order.workerpool,
+        workerpoolmaxprice: signedOrder.order.workerpoolmaxprice,
+        requester: signedOrder.order.requester,
+        volume: signedOrder.order.volume,
+        tag: signedOrder.order.tag,
+        category: signedOrder.order.category,
+        trust: signedOrder.order.trust,
+        beneficiary: signedOrder.order.beneficiary,
+        callback: signedOrder.order.callback || "0x0000000000000000000000000000000000000000", // ✅ Ensure callback exists
+        params: signedOrder.order.params,
+        salt: signedOrder.order.salt
+      },
       orderHash: signedOrder.orderHash,
       signature: signedOrder.signature,
       signer: signedOrder.signer
     };
     
-    console.log("Publishing order with:", {
-      orderHash: publishableOrder.orderHash?.substring(0, 20) + "...",
-      signatureLength: publishableOrder.signature?.length,
-      signer: publishableOrder.signer
-    });
+    console.log("Publishing with callback:", publishableOrder.order.callback);
     
     let orderHash;
     
     try {
-      // Try order.publishRequestorder first (most common)
+      // Try order.publishRequestorder first
       if (iexec.order.publishRequestorder) {
         console.log("Publishing via order.publishRequestorder");
         orderHash = await iexec.order.publishRequestorder(publishableOrder);
@@ -237,12 +271,15 @@ export const publishTaskOrder = async (iexec: any, signedOrder: SignedOrder): Pr
         console.log("✅ Published successfully, orderHash:", orderHash);
       }
       else {
-        // If no publish method, return the order hash we already have
         orderHash = signedOrder.orderHash;
         console.log("No publish method available, using existing order hash:", orderHash);
       }
     } catch (publishError: any) {
-      console.error("Publish failed:", publishError.message);
+      console.error("Publish error details:", {
+        message: publishError.message,
+        stack: publishError.stack,
+        orderStructure: publishableOrder
+      });
       
       // Even if publish fails, we still have the order hash
       orderHash = signedOrder.orderHash;
@@ -269,7 +306,6 @@ export const publishTaskOrder = async (iexec: any, signedOrder: SignedOrder): Pr
 };
 
 // Rest of the functions remain the same...
-
 export const monitorTask = async (iexec: any, taskId: string): Promise<any> => {
   try {
     return {

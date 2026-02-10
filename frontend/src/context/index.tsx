@@ -36,6 +36,18 @@ function WalletConnectionStatus({ children }: { children: ReactNode }) {
         console.warn('Reown API connection issue - using local configuration');
         return; // Don't show as error in console
       }
+      
+      // ✅ FIX: Don't intercept iExec SDK errors
+      if (args[0] && typeof args[0] === 'string' && 
+          (args[0].includes('iExec') || 
+           args[0].includes('callback is a required field') ||
+           args[0].includes('iexec') ||
+           args[0].includes('tee framework'))) {
+        // Let iExec errors pass through normally
+        originalConsoleError(...args);
+        return;
+      }
+      
       // Check for duplicate key errors
       if (args[0] && typeof args[0] === 'string' && 
           args[0].includes('Encountered two children with the same key')) {
@@ -43,6 +55,7 @@ function WalletConnectionStatus({ children }: { children: ReactNode }) {
         originalConsoleWarn(...args);
         return;
       }
+      
       originalConsoleError(...args);
     };
 

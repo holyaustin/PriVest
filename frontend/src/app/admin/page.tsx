@@ -324,12 +324,16 @@ export default function AdminPortal() {
     try {
       console.log("Preparing task order with data:", inputData);
       
-      // Use the imported function (renamed as createIExecTaskOrder)
+      // ✅ Ensure CONTRACT_ADDRESS is defined and valid
+      const contractAddress = CONTRACT_ADDRESS || "0x5b4dCD6038a092d36afEB2e2C56A8201544c6eC1";
+      console.log("Using contract address as callback:", contractAddress);
+      
+      // Use the imported function
       const { signedOrder, inputDataString } = await createIExecTaskOrder(iexec, inputData, {
         appAddress: IAPP_ADDRESS,
         workerpoolAddress: WORKERPOOL,
         requesterAddress: address || "",
-        callbackAddress: CONTRACT_ADDRESS || undefined
+        callbackAddress: contractAddress // ✅ Pass the contract address
       });
       
       return {
